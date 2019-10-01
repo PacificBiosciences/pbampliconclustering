@@ -1,6 +1,8 @@
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 sns.set_style('whitegrid')

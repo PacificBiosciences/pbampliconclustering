@@ -36,7 +36,8 @@ def main(parser):
 
     if args.testPlot:
         #plot kdist and exit
-        print("Plotting distance to k-neighbors")
+        from src.figures.kdist import plotEPS
+        print("Plotting distance to m-neighbors")
         f = plotEPS(data,args.minReads)
         f.savefig('%s.eps_estimator.png' % args.prefix)
         return data
@@ -67,8 +68,8 @@ def main(parser):
         addHPtag(args.inBAM,outBam,clusterMap,dropNoClust=args.drop,splitBam=args.splitBam)
 
     if args.plotReads:
+        from src.figures.cluster import plotReads 
         fig = plotReads(data,clusterIdx)
-        fig.tight_layout()
         fig.savefig('%s.clusters.png' % args.prefix)
     
     return None
