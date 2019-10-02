@@ -9,7 +9,8 @@ Under Construction
                                [-m,--minReads MINREADS]
                                [-n,--normalize {l1,l2,none}]
                                [-i,--ignoreEnds IGNOREENDS] [-r,--region REGION]
-                               [-q,--minQV MINQV] [-s,--simpsonDominance SIMPSON]
+                               [--extractReference REFERENCE] [-q,--minQV MINQV]
+                               [-s,--simpsonDominance SIMPSON]
                                [-w,--whitelist WHITELIST] [-f,--flanks FLANKS]
                                [-p,--prefix PREFIX] [-S,--splitBam] [-x,--noBam]
                                [-d,--drop] [-t,--testPlot] [-g,--plotReads]
@@ -34,8 +35,8 @@ Under Construction
     cluster:
       -M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}
                             clustering model. See https://scikit-
-                            learn.org/stable/modules/clustering.html.
-                            Default dbscan
+                            learn.org/stable/modules/clustering.html. Default
+                            dbscan
       -a,--agg {pca,featagg}
                             Feature reduction method. Default pca
       -c,--components COMPONENTS
@@ -54,13 +55,19 @@ Under Construction
       -r,--region REGION    Target region for selection of reads, format
                             '[chr]:[start]-[stop]'. Example '4:3076604-3076660'.
                             Default all reads (no region)
+      --extractReference REFERENCE
+                            Extract subsequence at region coordinates for
+                            clustering using fasta reference (must have .fai).
+                            Maps 100nt on either side of region to each read and
+                            extracts sequence inbetween for kmer counting. Default
+                            use full read
       -q,--minQV MINQV      Minimum quality [0-1] to use for clustering. Default
                             0.99
       -s,--simpsonDominance SIMPSON
                             Dominance filter for kmers. Remove kmers with > s
                             (dominance). Default 0.00 (no filter)
       -w,--whitelist WHITELIST
-                            whitelist of reads to cluster. Default None
+                            whitelist of read names to cluster. Default None
       -f,--flanks FLANKS    fasta of flanking/primer sequence. Reads not mapping
                             to both will be filtered. Default None
     
@@ -74,6 +81,6 @@ Under Construction
       -t,--testPlot         Plot reads vs dist to nearest m-neighbors without
                             clustering
       -g,--plotReads        Plot first 2 axes of PCA for each read. Default no
-                            plot generated 
+                            plot generated
     
 THIS WEBSITE AND CONTENT AND ALL SITE-RELATED SERVICES, INCLUDING ANY DATA, ARE PROVIDED "AS IS," WITH ALL FAULTS, WITH NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, ANY WARRANTIES OF MERCHANTABILITY, SATISFACTORY QUALITY, NON-INFRINGEMENT OR FITNESS FOR A PARTICULAR PURPOSE. YOU ASSUME TOTAL RESPONSIBILITY AND RISK FOR YOUR USE OF THIS SITE, ALL SITE-RELATED SERVICES, AND ANY THIRD PARTY WEBSITES OR APPLICATIONS. NO ORAL OR WRITTEN INFORMATION OR ADVICE SHALL CREATE A WARRANTY OF ANY KIND. ANY REFERENCES TO SPECIFIC PRODUCTS OR SERVICES ON THE WEBSITES DO NOT CONSTITUTE OR IMPLY A RECOMMENDATION OR ENDORSEMENT BY PACIFIC BIOSCIENCES.
