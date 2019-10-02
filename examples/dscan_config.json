@@ -1,0 +1,5 @@
+{
+    "eps"       : 0.02,
+    "metric"    : "l1",
+    "algorithm" : "kd_tree"
+}

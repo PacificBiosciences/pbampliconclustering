@@ -6,6 +6,7 @@ from sklearn.cluster import DBSCAN,\
                             MeanShift
 import numpy as np
 from collections import Counter
+import json
 
 class ClusterModel:
     '''
@@ -19,6 +20,12 @@ class ClusterModel:
     MODEL    = None
 
     def __init__(self,args):
+        #load json first to override defaults
+        if args.params:
+            with open(args.params) as configFile:
+                config = json.load(configFile)
+            self.defaults.update(config)
+        #override again with CL if not None or 0
         self.defaults.update({mparam:getattr(args,aparam) 
                               for aparam,mparam in self.pmap.items() 
                               if getattr(args,aparam)})
@@ -47,7 +54,8 @@ class Dbscan(ClusterModel):
                 'min_samples': 3,
                 'metric'     : 'euclidean'}
     pmap     = {'eps'        : 'eps',
-                'minReads'  : 'min_samples'}
+                'minReads'   : 'min_samples',
+                'njobs'      : 'n_jobs'}
 
 class Optics(ClusterModel):
     MODEL    = OPTICS

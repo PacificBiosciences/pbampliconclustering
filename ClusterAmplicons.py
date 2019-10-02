@@ -34,7 +34,7 @@ def main(parser):
                      norm       =args.normalize,
                      components =args.components,
                      agg        =args.agg,
-                     extractRef =args.extract)
+                     extractRef =args.reference)
 
     if args.testPlot:
         #plot kdist and exit
@@ -114,6 +114,8 @@ if __name__ == '__main__':
                     help='normalization of kmer counts.  Default %s'%DEFAULTNORM)
     clust.add_argument('-i,--ignoreEnds', dest='ignoreEnds', type=int, default=0,
                     help='ignore i bases at ends of amplicons for clustering.  Default 0')
+    clust.add_argument('-P,--params', dest='params', type=str, default=None,
+                    help='json file of parameters for specific model. Order of precedence: CL-opts > json > defaults. Default None')
     filt = parser.add_argument_group('filter')
     filt.add_argument('-r,--region', dest='region', type=str, default=None,
                     help='Target region for selection of reads, format \'[chr]:[start]-[stop]\'.  Example \'4:3076604-3076660\'. \nDefault all reads (no region)')
