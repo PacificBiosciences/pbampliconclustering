@@ -19,6 +19,8 @@ CLUSTNAME       = 'cluster{0}_numreads{1}'.format #args: int,int
 
 def main(parser):
     args = parser.parse_args()
+    if args.normalize == 'none':
+        args.normalize = None
 
     #load dataframe with samples(row) by kmer counts (cols)
     data = loadKmers(args.inBAM,args.minQV,args.kmer,
@@ -94,7 +96,7 @@ if __name__ == '__main__':
                     help='do not compress homopolymers.  Default collapse HP')
     clust = parser.add_argument_group('cluster')
     clust.add_argument('-M,--model', dest='model', type=str, choices=MODELS.keys(), default=DEFAULTMODEL,
-                    help='clustering model. See https://scikit-learn.org/stable/modules/clustering.html#clustering. Default %s'%DEFAULTMODEL)
+                    help='clustering model. See https://scikit-learn.org/stable/modules/clustering.html. Default %s'%DEFAULTMODEL)
     clust.add_argument('-a,--agg', dest='agg', type=str, choices=['pca','featagg'],default='pca',
                     help='Feature reduction method. Default pca')
     clust.add_argument('-c,--components', dest='components', type=int, default=DEFAULTCOMP,
@@ -115,7 +117,7 @@ if __name__ == '__main__':
     filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,
                     help='Dominance filter for kmers.  Remove kmers with > s (dominance). Default %.2f (no filter)'%DEFAULTSIMP)
     filt.add_argument('-w,--whitelist', dest='whitelist', type=str, default=None,
-                    help='whitelist of reads to cluster. Default None')
+                    help='whitelist of read names to cluster. Default None')
     filt.add_argument('-f,--flanks', dest='flanks', type=str, default=None,
                     help='fasta of flanking/primer sequence. Reads not mapping to both will be filtered. Default None')
     out = parser.add_argument_group('output')

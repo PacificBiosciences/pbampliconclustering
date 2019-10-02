@@ -34,7 +34,7 @@ Under Construction
     cluster:
       -M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}
                             clustering model. See https://scikit-
-                            learn.org/stable/modules/clustering.html#clustering.
+                            learn.org/stable/modules/clustering.html.
                             Default dbscan
       -a,--agg {pca,featagg}
                             Feature reduction method. Default pca
