@@ -7,8 +7,11 @@ from sklearn.neighbors import NearestNeighbors
 
 sns.set_style('whitegrid')
 
-def plotEPS(data,minReads):
-    distances,indices = NearestNeighbors(n_neighbors=minReads)\
+def plotEPS(data,minReads,metric):
+    if not metric:
+        metric = 'euclidean'
+    distances,indices = NearestNeighbors(n_neighbors=minReads,
+                                         metric=metric)\
                                         .fit(data)\
                                         .kneighbors(data)
     fig,ax = plt.subplots()

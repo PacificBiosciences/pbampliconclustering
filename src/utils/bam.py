@@ -31,8 +31,11 @@ def addHPtag(inBAM,outBAM,clusterMap,splitBam=False,noCluster=NOCLUST,dropNoClus
             outMap = {c:outbam for c in cvals.union([noCluster])}
         getbam = (lambda c: outMap[c])
         for rec in inbam:
-            if rec.query_name not in clusterMap and dropNoClust:
-                continue
+            if dropNoClust:
+                if rec.query_name not in clusterMap: #filtered
+                    continue
+                elif clusterMap[rec.query_name] == -1: #noise
+                    continue
             clust = int(clusterMap.get(rec.query_name,noCluster))
             rec.set_tag('YC',colors[clust])
             rec.set_tag('HP',clust)

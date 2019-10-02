@@ -33,13 +33,14 @@ def main(parser):
                      simpson    =args.simpson,
                      norm       =args.normalize,
                      components =args.components,
-                     agg        =args.agg)
+                     agg        =args.agg,
+                     extractRef =args.extract)
 
     if args.testPlot:
         #plot kdist and exit
         from src.figures.kdist import plotEPS
         print("Plotting distance to m-neighbors")
-        f = plotEPS(data,args.minReads)
+        f = plotEPS(data,args.minReads,args.normalize)
         f.savefig('%s.eps_estimator.png' % args.prefix)
         return data
     
@@ -55,9 +56,13 @@ def main(parser):
     #cluster size and warning if too much noise as frac of total
 
     #write cluster file
-    print("Writing clusters")
     with open('%s.clusters.txt' % args.prefix, 'w') as namefile:
-        for cluster,reads in data.groupby(clusterIdx):
+        grouped = data.groupby(clusterIdx)
+        cnts    = sorted([len(idx) for c,idx in grouped.groups.items() if c!=-1],reverse=True)
+        print("Writing clusters with nreads %s" % ','.join(map(str,cnts)))
+        if -1 in grouped.groups:
+            print("%i reads identified as noise" % len(grouped.groups[-1]))
+        for cluster,reads in grouped:
             nreads = len(reads)
             name = 'Noise_numreads%i'%nreads if cluster==-1 else CLUSTNAME(cluster,nreads)
             namefile.write('>%s\n' % name)
@@ -112,6 +117,8 @@ if __name__ == '__main__':
     filt = parser.add_argument_group('filter')
     filt.add_argument('-r,--region', dest='region', type=str, default=None,
                     help='Target region for selection of reads, format \'[chr]:[start]-[stop]\'.  Example \'4:3076604-3076660\'. \nDefault all reads (no region)')
+    filt.add_argument('--extractReference', dest='extract', type=str, default=None,
+                    help='Extract subsequence at region coordinates for clustering.  Requires reference with .fai and uses 100nt on either side of region. \nDefault use full read')
     filt.add_argument('-q,--minQV', dest='minQV', type=float, default=0.99,
                     help='Minimum quality [0-1] to use for clustering. Default 0.99')
     filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,

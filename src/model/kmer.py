@@ -54,14 +54,29 @@ def simpsonFilter(data,maxDom):
                   .apply(ad.dominance) < maxDom
     return data.loc[:,data.columns[useMers]]
 
+def noFilter(x):
+    return True
+
 def loadKmers(inBAM,qual,k,
               collapse=True,region=None,
               minimizer=0,ignoreEnds=0,
               whitelist=None,flanks=None,
               simpson=None,norm=None,
-              components=3,agg='pca'):
+              components=3,agg='pca',
+              extractRef=None):
+    '''
+    kmer loader
+    '''
     bam         = pysam.AlignmentFile(inBAM)
-    recGen      = bam.fetch(*getCoordinates(region)) if region else bam
+    if region:
+        if extractRef:
+            from ..utils.extract import extractRegion
+            recGen = extractRegion(inBAM,extractRef,region)
+        else:
+            recGen = bam.fetch(*getCoordinates(region))
+    else:
+        recGen = bam
+
     kmerCounter = countKmers(k,collapseHP=collapse,
                              minimizer=minimizer,
                              ignoreEnds=ignoreEnds)
@@ -69,9 +84,9 @@ def loadKmers(inBAM,qual,k,
         wl      = open(whitelist).read().split()
         useRead = (lambda read: read in wl)
     else:
-        useRead = (lambda read: True)
+        useRead = noFilter
     passQuality = qualityCrit(qual)
-    flankCrit   = getFlankCrit(flanks) if flanks else (lambda s: True)
+    flankCrit   = getFlankCrit(flanks) if flanks else noFilter
 
     print("Reading Sequence")
     data = pd.concat([pd.Series(kmerCounter(rec.query_sequence),
