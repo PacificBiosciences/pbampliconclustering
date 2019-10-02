@@ -1,6 +1,6 @@
 Under Construction
 
-   $ py3 ClusterAmplicons.py  -h
+    $ py3 ClusterAmplicons.py  -h
     usage: ClusterAmplicons.py [-h] [-j,--njobs NJOBS] [-k,--kmer KMER]
                                [-z,--minimizer MINIMIZER] [-H,--noHPcollapse]
                                [-M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}]
