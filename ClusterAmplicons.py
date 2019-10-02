@@ -14,7 +14,6 @@ DEFAULTCOMP     = 2
 DEFAULTEPS      = 0.0
 DEFAULTSIMP     = 0.0
 DEFAULTPREFIX   = './clustered'
-PALETTE         = 'husl'
 CLUSTNAME       = 'cluster{0}_numreads{1}'.format #args: int,int
 
 
@@ -44,8 +43,9 @@ def main(parser):
     
     #Clustering
     cluster     = MODELS[args.model](args)
-    print("Clustering with {m}\n{p}".format(m=args.model,
-                                            p=printParams(cluster)))
+    print("Clustering {n} reads with {m}\n{p}".format(n=len(data),
+                                                      m=args.model,
+                                                      p=printParams(cluster)))
     result      = cluster.fit(data)
     clusterIdx  = result.labels_
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                     help='do not compress homopolymers.  Default collapse HP')
     clust = parser.add_argument_group('cluster')
     clust.add_argument('-M,--model', dest='model', type=str, choices=MODELS.keys(), default=DEFAULTMODEL,
-                    help='clustering model. Default %s'%DEFAULTMODEL)
+                    help='clustering model. See https://scikit-learn.org/stable/modules/clustering.html#clustering. Default %s'%DEFAULTMODEL)
     clust.add_argument('-a,--agg', dest='agg', type=str, choices=['pca','featagg'],default='pca',
                     help='Feature reduction method. Default pca')
     clust.add_argument('-c,--components', dest='components', type=int, default=DEFAULTCOMP,
