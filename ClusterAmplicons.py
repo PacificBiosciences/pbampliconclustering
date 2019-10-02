@@ -118,7 +118,7 @@ if __name__ == '__main__':
     filt.add_argument('-r,--region', dest='region', type=str, default=None,
                     help='Target region for selection of reads, format \'[chr]:[start]-[stop]\'.  Example \'4:3076604-3076660\'. \nDefault all reads (no region)')
     filt.add_argument('--extractReference', dest='reference', type=str, default=None,
-                    help='Extract subsequence at region coordinates for clustering using fasta reference (must have .fai). Maps 100nt on either side of region to each read and extracts sequence inbetween for kmer counting. \nDefault use full read')
+                    help='Extract subsequence at region coordinates for clustering using fasta reference (must have .fai). Maps 100nt on either side of region to each read and extracts sequence inbetween for kmer counting. \nDefault None (use full read)')
     filt.add_argument('-q,--minQV', dest='minQV', type=float, default=0.99,
                     help='Minimum quality [0-1] to use for clustering. Default 0.99')
     filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,

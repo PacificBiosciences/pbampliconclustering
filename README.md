@@ -60,7 +60,7 @@ Under Construction
                             clustering using fasta reference (must have .fai).
                             Maps 100nt on either side of region to each read and
                             extracts sequence inbetween for kmer counting. Default
-                            use full read
+                            None (use full read)
       -q,--minQV MINQV      Minimum quality [0-1] to use for clustering. Default
                             0.99
       -s,--simpsonDominance SIMPSON
