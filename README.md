@@ -14,6 +14,7 @@ Under Construction
         describe          describe models
 
 Describe defaults and CL => KW argument map
+
     $ py3 ClusterAmplicons.py describe -M dbscan
     -----------------DBSCAN-----------------
     ArgMap:
@@ -26,6 +27,7 @@ Describe defaults and CL => KW argument map
                   metric => euclidean
 
 Clustering Reads
+
     $ py3 ClusterAmplicons.py cluster -h
     usage: ClusterAmplicons.py cluster [-h] [-j,--njobs NJOBS] [-k,--kmer KMER]
                                        [-z,--minimizer MINIMIZER]
