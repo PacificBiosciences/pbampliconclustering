@@ -5,6 +5,7 @@ import os,sys
 from src.model.kmer   import *
 from src.model.models import MODELS
 from src.utils.bam import addHPtag
+from src.utils.extract import Extract_Exception
 
 DEFAULTMODEL    = 'dbscan'
 DEFAULTKMER     = 11

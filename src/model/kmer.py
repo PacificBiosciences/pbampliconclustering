@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
 from .models import Clustering_Exception
 from ..utils.extract import getCoordinates, \
-                            Extract_Exception
+                            extractRegion
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
@@ -64,7 +64,6 @@ def loadKmers(inBAM,qual,k,
     bam         = pysam.AlignmentFile(inBAM)
     if region:
         if extractRef:
-            from ..utils.extract import extractRegion
             recGen = extractRegion(inBAM,extractRef,region)
         else:
             recGen = bam.fetch(*getCoordinates(region))
