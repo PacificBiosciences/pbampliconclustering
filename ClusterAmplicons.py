@@ -41,14 +41,12 @@ def main(parser):
         from src.figures.kdist import plotEPS
         print("Plotting distance to m-neighbors")
         f = plotEPS(data,args.minReads,args.normalize)
-        f.savefig('%s.eps_estimator.png' % args.prefix)
+        f.savefig(f'{args.prefix}.eps_estimator.png')
         return data
     
     #Clustering
     cluster     = MODELS[args.model](args)
-    print("Clustering {n} reads with {m}\n{p}".format(n=len(data),
-                                                      m=args.model,
-                                                      p=printParams(cluster)))
+    print(f'Clustering {len(data)} reads with {args.model}\n{printParams(cluster)}')
     result      = cluster.fit(data)
     clusterIdx  = result.labels_
 
@@ -56,28 +54,28 @@ def main(parser):
     #cluster size and warning if too much noise as frac of total
 
     #write cluster file
-    with open('%s.clusters.txt' % args.prefix, 'w') as namefile:
+    with open(f'{args.prefix}.clusters.txt', 'w') as namefile:
         grouped = data.groupby(clusterIdx)
         cnts    = sorted([len(idx) for c,idx in grouped.groups.items() if c!=-1],reverse=True)
-        print("Writing clusters with nreads %s" % ','.join(map(str,cnts)))
+        print(f'Writing clusters with nreads {",".join(map(str,cnts))}')
         if -1 in grouped.groups:
-            print("%i reads identified as noise" % len(grouped.groups[-1]))
+            print(f'{len(grouped.groups[-1])} reads identified as noise')
         for cluster,reads in grouped:
             nreads = len(reads)
-            name = 'Noise_numreads%i'%nreads if cluster==-1 else CLUSTNAME(cluster,nreads)
-            namefile.write('>%s\n' % name)
+            name = f'Noise_numreads{nreads}' if cluster==-1 else CLUSTNAME(cluster,nreads)
+            namefile.write(f'>{name}\n')
             namefile.write('\n'.join(reads.index) + '\n')
     
     if not args.noBam:
         print("Adding HP tag to bam")
         clusterMap = dict(zip(data.index,clusterIdx))
-        outBam     = '%s.hptagged.bam' % args.prefix
+        outBam     = f'{args.prefix}.hptagged.bam'
         addHPtag(args.inBAM,outBam,clusterMap,dropNoClust=args.drop,splitBam=args.splitBam)
 
     if args.plotReads:
         from src.figures.cluster import plotReads 
         fig = plotReads(data,clusterIdx)
-        fig.savefig('%s.clusters.png' % args.prefix)
+        fig.savefig(f'{args.prefix}.clusters.png')
     
     return None
 
@@ -91,27 +89,27 @@ if __name__ == '__main__':
     parser.add_argument('inBAM', metavar='inBAM', type=str,
                     help='input BAM of CCS alignments')
     parser.add_argument('-j,--njobs', dest='njobs', type=int, default=None,
-                    help='j parallel jobs (only for OPTICS). Default 1')
+                    help='j parallel jobs (only for some models). Default 1')
     kmer = parser.add_argument_group('kmers')
     kmer.add_argument('-k,--kmer', dest='kmer', type=int, default=DEFAULTKMER,
-                    help='kmer size for clustering. Default %i'%DEFAULTKMER)
+                    help=f'kmer size for clustering. Default {DEFAULTKMER}')
     kmer.add_argument('-z,--minimizer', dest='minimizer', type=int, default=0,
                     help='group kmers by minimizer of length z. Default 0 (no minimizer)')
     kmer.add_argument('-H,--noHPcollapse', dest='hpCollapse', action='store_false', default=True,
                     help='do not compress homopolymers.  Default collapse HP')
     clust = parser.add_argument_group('cluster')
     clust.add_argument('-M,--model', dest='model', type=str, choices=MODELS.keys(), default=DEFAULTMODEL,
-                    help='clustering model. See https://scikit-learn.org/stable/modules/clustering.html. Default %s'%DEFAULTMODEL)
+                    help=f'clustering model. See https://scikit-learn.org/stable/modules/clustering.html. Default {DEFAULTMODEL}')
     clust.add_argument('-a,--agg', dest='agg', type=str, choices=['pca','featagg'],default='pca',
                     help='Feature reduction method. Default pca')
     clust.add_argument('-c,--components', dest='components', type=int, default=DEFAULTCOMP,
-                    help='Use first c components of PCA/FeatAgg for clustering. Set to 0 for no reduction. Default %i'%DEFAULTCOMP)
+                    help=f'Use first c components of PCA/FeatAgg for clustering. Set to 0 for no reduction. Default {DEFAULTCOMP}')
     clust.add_argument('-e,--eps', dest='eps', type=float, default=None,
                     help='eps cluster tolerance. Default None')
     clust.add_argument('-m,--minReads', dest='minReads', type=int, default=DEFAULTMINREADS,
-                    help='Minimum reads to be a cluster. Default %i'%DEFAULTMINREADS)
+                    help=f'Minimum reads to be a cluster. Default {DEFAULTMINREADS}')
     clust.add_argument('-n,--normalize', dest='normalize', type=str, choices=['l1','l2','none'], default=DEFAULTNORM,
-                    help='normalization of kmer counts.  Default %s'%DEFAULTNORM)
+                    help=f'normalization of kmer counts.  Default {DEFAULTNORM}')
     clust.add_argument('-i,--ignoreEnds', dest='ignoreEnds', type=int, default=0,
                     help='ignore i bases at ends of amplicons for clustering.  Default 0')
     clust.add_argument('-P,--params', dest='params', type=str, default=None,
@@ -124,14 +122,14 @@ if __name__ == '__main__':
     filt.add_argument('-q,--minQV', dest='minQV', type=float, default=0.99,
                     help='Minimum quality [0-1] to use for clustering. Default 0.99')
     filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,
-                    help='Dominance filter for kmers.  Remove kmers with > s (dominance). Default %.2f (no filter)'%DEFAULTSIMP)
+                    help=f'Dominance filter for kmers.  Remove kmers with > s (dominance). Default {DEFAULTSIMP:.2f} (no filter)')
     filt.add_argument('-w,--whitelist', dest='whitelist', type=str, default=None,
                     help='whitelist of read names to cluster. Default None')
     filt.add_argument('-f,--flanks', dest='flanks', type=str, default=None,
                     help='fasta of flanking/primer sequence. Reads not mapping to both will be filtered. Default None')
     out = parser.add_argument_group('output')
     out.add_argument('-p,--prefix', dest='prefix', type=str, default=DEFAULTPREFIX,
-                    help='Output prefix. Default %s'%DEFAULTPREFIX)
+                    help=f'Output prefix. Default {DEFAULTPREFIX}')
     out.add_argument('-S,--splitBam', dest='splitBam', action='store_true',
                     help='split clusters into separate bams (noise and no-cluster dropped). Default one bam')
     out.add_argument('-x,--noBam', dest='noBam', action='store_true',
@@ -145,6 +143,6 @@ if __name__ == '__main__':
 
     try:
         main(parser)
-    except Clustering_Exception as e:
-        print('ERROR: %s' % e)
+    except (Clustering_Exception,Kmer_Exception,Extract_Exception) as e:
+        print(f'ERROR: {e}')
         sys.exit(1)

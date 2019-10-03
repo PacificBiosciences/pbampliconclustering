@@ -8,6 +8,8 @@ from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
 from .models import Clustering_Exception
+from ..utils.extract import getCoordinates, \
+                            Extract_Exception
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
@@ -38,14 +40,6 @@ def getMinimizer(m=6):
     def minimizer(seq):
         return sorted(seq[i:i+m] for i in range(0,len(seq)-m))[0]
     return minimizer
-
-def getCoordinates(regionString):
-    try:
-        ctg,start,stop = re.search('(.*):(\d+)-(\d+)',regionString).groups()
-    except AttributeError as e:
-            #catch when the region format doesn't match
-            raise Clustering_Exception('Invalid region format %s. Correct \'[chr]:[start]-[stop]\'' % regionString)
-    return ctg.strip(),int(start),int(stop)
 
 def simpsonFilter(data,maxDom):
     print('Filtering by dominance')
@@ -103,18 +97,18 @@ def loadKmers(inBAM,qual,k,
                             index=data.index,
                             columns=data.columns)
     if components:
-        print('Reducing Features with %s' % agg)
+        print(f'Reducing Features with {agg}')
         if agg == 'pca':
             tool = PCA(n_components=components)
         elif agg == 'featagg':
             tool = FeatureAgglomeration(n_clusters=components)
         else:
-            raise Kmer_Error('%s is not a valid reduction tool' % agg)
+            raise Kmer_Error(f'{agg} is not a valid reduction tool')
         data = pd.DataFrame(tool.fit_transform(data),
                             index=data.index)
 
     return data
 
-class Kmer_Error(Exception):
+class Kmer_Exception(Exception):
     pass
 

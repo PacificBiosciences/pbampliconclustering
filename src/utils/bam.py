@@ -2,8 +2,10 @@ import pysam
 import seaborn as sns
 import numpy as np
 
-PALETTE='husl'
-NOCLUST=999
+PALETTE     ='husl'
+NOCLUST     =999
+NOCLUSTCOLOR='255,255,255'
+NOISECOLOR  ='200,200,200'
 
 def addHPtag(inBAM,outBAM,clusterMap,splitBam=False,noCluster=NOCLUST,dropNoClust=False):
     '''clusterMap is map of {readname:cluster::int}'''
@@ -12,14 +14,14 @@ def addHPtag(inBAM,outBAM,clusterMap,splitBam=False,noCluster=NOCLUST,dropNoClus
     rgb     = np.array(sns.color_palette(PALETTE,ncolors))
     colors  = {clust:','.join(map(str,(col*255 +1).astype(int)))
                for clust,col in zip(cvals,rgb)}
-    colors[noCluster] = '255,255,255'
+    colors[noCluster] = NOCLUSTCOLOR
     #noise
-    colors[-1] = '200,200,200'
+    colors[-1] = NOISECOLOR
 
     with pysam.AlignmentFile(inBAM) as inbam:
         if splitBam:
             names  = [re.sub('.bam$',
-                             '.%s.bam'%('Noise' if c==-1 else str(c)),
+                             f'.{"Noise" if c==-1 else str(c)}.bam',
                              outBAM)
                       for c in cvals ]
             outMap = {c : pysam.AlignmentFile(n,'wb',template=inbam)

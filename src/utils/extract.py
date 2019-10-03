@@ -22,9 +22,9 @@ def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flan
     if region:
         try:
             ctg,start,stop = getCoordinates(region)
-        except AttributeError:
+        except AttributeError as e:
             #catch when the region format doesn't match
-            raise Extract_Exception('Invalid region format %s. Correct \'[chr]:[start]-[stop]\'' % region)
+            raise Extract_Exception(f'Invalid region format {region}. Correct \'[chr]:[start]-[stop]\'') from None
     elif ctg==None or start==None or stop==None:
             #catch when missing coord and no region passed
             raise Extract_Exception('Must pass either valid region string or all of ctg,start,stop')

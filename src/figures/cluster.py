@@ -15,6 +15,6 @@ def plotReads(data,clusters):
         sns.scatterplot(data.iloc[:,0],data.iloc[:,1],hue=hue,ax=ax)
 #        ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), ncol=ncol)
         ax.set_xlabel('PCA1')
-        ax.set_ylabel("PCA2")
+        ax.set_ylabel('PCA2')
     fig.tight_layout()
     return fig
