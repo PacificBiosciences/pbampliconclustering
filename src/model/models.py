@@ -32,6 +32,13 @@ class ClusterModel:
         self.model = self.MODEL(**self.defaults)
     def fit(self,X):
         return self.model.fit(X)
+    def __repr__(self):
+        name          = self.MODEL.__name__
+        dashes        = ''.join(['-']*((40 - len(name)) // 2))
+        pmap,defaults = ['\n'.join([f'{arg:>20} => {kw}' 
+                                    for arg,kw in getattr(self,var).items()]) 
+                         for var in ['pmap','defaults']]
+        return f'{dashes}{name}{dashes}\nArgMap:\n{pmap}\nDefaults:\n{defaults}\n'
 
 class ClusterModel_wNoise(ClusterModel):
     '''
@@ -114,6 +121,12 @@ MODELS = {'dbscan'    : Dbscan,
           'affprop'   : Affprop,
           'meanshift' : Meanshift,
           'kmeans'    : Kmeans}
+
+def showModels(args):
+    models = [MODELS[args.model]] if args.model else MODELS.values()
+
+    for m in models:
+        print(m.__repr__(m))
 
 class Clustering_Exception(Exception):
     pass
