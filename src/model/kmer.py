@@ -61,7 +61,7 @@ def loadKmers(inBAM,qual,k,
     '''
     kmer loader
     '''
-    bam         = pysam.AlignmentFile(inBAM)
+    bam         = pysam.AlignmentFile(inBAM,'rb')
     if region:
         if extractRef:
             recGen = extractRegion(inBAM,extractRef,region)

@@ -11,7 +11,7 @@ from src.utils.extract import Extract_Exception
 
 DEFAULTMODEL    = 'dbscan'
 DEFAULTKMER     = 11
-DEFAULTNORM     = 'l1'
+DEFAULTNORM     = 'l2'
 DEFAULTMINREADS = 5
 DEFAULTCOMP     = 2
 DEFAULTEPS      = 0.0
@@ -25,11 +25,11 @@ parser_main.set_defaults(func=main)
 parser_desc = subparsers.add_parser('describe', help='describe models')
 parser_desc.set_defaults(func=showModels)
 #describe
-parser_desc.add_argument('-M,--model', dest='model', type=str, default=None,
+parser_desc.add_argument('-M,--model', dest='model', choices=MODELS.keys(), type=str, default=None,
                 help='Show argmap and defaults for specfic model. Default None (show all)')
 
 #cluster
-parser_main.add_argument('inBAM', metavar='inBAM', type=str,
+parser_main.add_argument('inBAM', metavar='inBAM', nargs='?', type=str, default='-',
                 help='input BAM of CCS alignments')
 parser_main.add_argument('-j,--njobs', dest='njobs', type=int, default=None,
                 help='j parallel jobs (only for some models). Default 1')
@@ -86,6 +86,9 @@ out.add_argument('-g,--plotReads', dest='plotReads', action='store_true',
 
 try:
     args = parser.parse_args()
+    if hasattr(args,'inBAM'):
+        if args.inBAM=='-' and not args.noBam:
+            raise Clustering_Exception('Retagging streamed bam is not supported.  Please use -x option')
     args.func(args)
 except (Clustering_Exception,Kmer_Exception,Extract_Exception) as e:
     print(f'ERROR: {e}')
