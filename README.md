@@ -15,7 +15,6 @@ Under Construction
 
 Describe defaults and CL => KW argument map
 
-    $ py3 ClusterAmplicons.py describe -M dbscan
     -----------------DBSCAN-----------------
     ArgMap:
                      eps => eps
@@ -25,6 +24,7 @@ Describe defaults and CL => KW argument map
                      eps => 0.01
              min_samples => 3
                   metric => euclidean
+                  n_jobs => 2
 
 Clustering Reads
 
@@ -46,10 +46,10 @@ Clustering Reads
                                        [-f,--flanks FLANKS] [-p,--prefix PREFIX]
                                        [-S,--splitBam] [-x,--noBam] [-d,--drop]
                                        [-t,--testPlot] [-g,--plotReads]
-                                       inBAM
+                                       [inBAM]
     
     positional arguments:
-      inBAM                 input BAM of CCS alignments
+      inBAM                 input BAM of CCS alignments. Default stdin
     
     optional arguments:
       -h, --help            show this help message and exit
@@ -76,7 +76,7 @@ Clustering Reads
       -m,--minReads MINREADS
                             Minimum reads to be a cluster. Default 5
       -n,--normalize {l1,l2,none}
-                            normalization of kmer counts. Default l1
+                            normalization of kmer counts. Default l2
       -i,--ignoreEnds IGNOREENDS
                             ignore i bases at ends of amplicons for clustering.
                             Default 0

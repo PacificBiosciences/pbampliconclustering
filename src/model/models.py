@@ -59,7 +59,8 @@ class Dbscan(ClusterModel):
     MODEL    = DBSCAN
     defaults = {'eps'        : 0.01,
                 'min_samples': 3,
-                'metric'     : 'euclidean'}
+                'metric'     : 'euclidean',
+                'n_jobs'     : 2}
     pmap     = {'eps'        : 'eps',
                 'minReads'   : 'min_samples',
                 'njobs'      : 'n_jobs'}
@@ -89,6 +90,7 @@ class Kmeans(ClusterModel):
 class Aggcluster(ClusterModel_wNoise):
     MODEL    = AgglomerativeClustering
     defaults = {'affinity'          : 'euclidean',
+                'linkage'           : 'ward',
                 'compute_full_tree' : True,
                 'distance_threshold': 0.01,
                 'n_clusters'        : None}

@@ -30,7 +30,7 @@ parser_desc.add_argument('-M,--model', dest='model', choices=MODELS.keys(), type
 
 #cluster
 parser_main.add_argument('inBAM', metavar='inBAM', nargs='?', type=str, default='-',
-                help='input BAM of CCS alignments')
+                help='input BAM of CCS alignments. Default stdin')
 parser_main.add_argument('-j,--njobs', dest='njobs', type=int, default=None,
                 help='j parallel jobs (only for some models). Default 1')
 kmer = parser_main.add_argument_group('kmers')
