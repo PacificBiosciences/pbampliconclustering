@@ -1,5 +1,6 @@
 import re,pysam
 from collections import Counter
+from multiprocessing import Pool,cpu_count
 import pandas as pd
 import numpy as np
 import mappy as mp
@@ -16,8 +17,8 @@ def hpCollapse(seq):
     return _PATT.sub(r'\1',seq)
 
 def countKmers(k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
-    transform =  hpCollapse if collapseHP else (lambda x:x)
-    minim     =  getMinimizer(minimizer) if minimizer>0 else (lambda x:x)
+    transform =  hpCollapse if collapseHP else ident
+    minim     =  getMinimizer(minimizer) if minimizer>0 else ident
     end       =  -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
     def getKmers(seq):
         s = transform(seq[ignoreEnds:end])
@@ -42,20 +43,20 @@ def getMinimizer(m=6):
     return minimizer
 
 def simpsonFilter(data,maxDom):
-    print('Filtering by dominance')
-    useMers = data.apply(pd.Series.value_counts)\
-                  .fillna(0).astype(int)\
-                  .apply(ad.dominance) < maxDom
-    return data.loc[:,data.columns[useMers]]
+    dom = data.apply(lambda feat: ad.dominance(np.bincount(feat)))
+    return data.loc[:,dom<=maxDom]
 
 def noFilter(x):
     return True
 
-def loadKmers(inBAM,qual,k,
+def ident(x):
+    return x
+
+def loadKmers(inBAM,qual,k,nproc=0,
               collapse=True,region=None,
               minimizer=0,ignoreEnds=0,
               whitelist=None,flanks=None,
-              simpson=None,norm=None,
+              trim=0,norm=None,
               components=3,agg='pca',
               extractRef=None):
     '''
@@ -70,9 +71,9 @@ def loadKmers(inBAM,qual,k,
     else:
         recGen = bam
 
-    kmerCounter = countKmers(k,collapseHP=collapse,
-                             minimizer=minimizer,
-                             ignoreEnds=ignoreEnds)
+    counter = kmerCounter(k,collapseHP=collapse,
+                          minimizer=minimizer,
+                          ignoreEnds=ignoreEnds)
     if whitelist:
         wl      = open(whitelist).read().split()
         useRead = (lambda read: read in wl)
@@ -82,14 +83,24 @@ def loadKmers(inBAM,qual,k,
     flankCrit   = getFlankCrit(flanks) if flanks else noFilter
 
     print("Reading Sequence")
-    data = pd.concat([pd.Series(kmerCounter(rec.query_sequence),
-                                name=rec.query_name)
-                      for rec in recGen
-                      if useRead(rec.query_name)
-                         and passQuality(rec)
-                         and flankCrit(rec)],
-                     axis=1,sort=True)\
+    proc = nproc if nproc else cpu_count()
+    pool = Pool(proc)
+    records = pool.map(recordMaker(counter),
+                       [(rec.query_name,rec.query_sequence) for rec in recGen 
+                        if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)])
+    #records = [recordMaker(counter)((rec.query_name,rec.query_sequence))
+    #           for rec in recGen 
+    #           if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)]
+    data = pd.concat(records,axis=1,sort=False)\
              .fillna(0).astype(int).T
+#    if simpson>0:
+#        print('Filtering by dominance')
+#        data = simpsonFilter(data,simpson)
+    if trim:
+        print("Trimming low-freq kmers")
+        freqs = data.sum()/len(data)
+        data  = data.loc[:,freqs>=trim] 
+
     if norm:
         print('Normalizing data')
         data = pd.DataFrame(normalize(data,norm=norm),
@@ -107,6 +118,25 @@ def loadKmers(inBAM,qual,k,
                             index=data.index)
 
     return data
+
+class kmerCounter:
+    def __init__(self,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
+        self.k         = k
+        self.transform = hpCollapse if collapseHP else ident
+        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
+        self.start     = ignoreEnds
+        self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
+    def __call__(self, seq):
+        s = self.transform(seq[self.start:self.end])
+        return Counter(self.minim(s[i:i+self.k]) for i in range(len(s)-self.k))
+    
+
+class recordMaker:
+    def __init__(self, counter):
+        self.counter = counter
+    def __call__(self, rec):
+        return pd.Series(self.counter(rec[1]),
+                         name=rec[0])
 
 class Kmer_Exception(Exception):
     pass

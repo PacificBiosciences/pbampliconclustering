@@ -20,15 +20,15 @@ class ClusterModel:
     MODEL    = None
 
     def __init__(self,args):
-        #load json first to override defaults
+        #load CL args first to override defaults
+        self.defaults.update({mparam:getattr(args,aparam) 
+                              for aparam,mparam in self.pmap.items() 
+                              if getattr(args,aparam)})
+        #override with param file
         if args.params:
             with open(args.params) as configFile:
                 config = json.load(configFile)
             self.defaults.update(config)
-        #override again with CL if not None or 0
-        self.defaults.update({mparam:getattr(args,aparam) 
-                              for aparam,mparam in self.pmap.items() 
-                              if getattr(args,aparam)})
         self.model = self.MODEL(**self.defaults)
     def fit(self,X):
         return self.model.fit(X)
@@ -71,7 +71,7 @@ class Optics(ClusterModel):
                 'min_samples': 3,
                 'n_jobs'     : 1,
                 'metric'     : 'l2',
-                'xi'         : 0.1}
+                'xi'         : 0.05}
     pmap     = {'eps'        : 'max_eps',
                 'minReads'   : 'min_samples',
                 'njobs'      : 'n_jobs',

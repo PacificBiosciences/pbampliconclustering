@@ -1,9 +1,8 @@
 from src.model.kmer   import *
 from src.model.models import MODELS
 from src.utils.bam import addHPtag
+from src.utils.clust import clusterName
 from src.utils.extract import Extract_Exception
-
-CLUSTNAME = 'cluster{0}_numreads{1}'.format #args: int,int
 
 def main(args):
     if args.normalize == 'none':
@@ -11,13 +10,15 @@ def main(args):
 
     #load dataframe with samples(row) by kmer counts (cols)
     data = loadKmers(args.inBAM,args.minQV,args.kmer,
+                     nproc      =args.njobs,
                      collapse   =args.hpCollapse,
                      region     =args.region,
                      minimizer  =args.minimizer,
                      ignoreEnds =args.ignoreEnds,
                      whitelist  =args.whitelist,
                      flanks     =args.flanks,
-                     simpson    =args.simpson,
+                     #simpson    =args.simpson,
+                     trim       =args.trim,
                      norm       =args.normalize,
                      components =args.components,
                      agg        =args.agg,
@@ -44,12 +45,12 @@ def main(args):
     with open(f'{args.prefix}.clusters.txt', 'w') as namefile:
         grouped = data.groupby(clusterIdx)
         cnts    = sorted([len(idx) for c,idx in grouped.groups.items() if c!=-1],reverse=True)
-        print(f'Writing clusters with nreads {",".join(map(str,cnts))}')
+        print(f'Writing {len(cnts)} clusters with nreads {",".join(map(str,cnts))}')
         if -1 in grouped.groups:
             print(f'{len(grouped.groups[-1])} reads identified as noise')
         for cluster,reads in grouped:
             nreads = len(reads)
-            name = f'Noise_numreads{nreads}' if cluster==-1 else CLUSTNAME(cluster,nreads)
+            name = f'Noise_numreads{nreads}' if cluster==-1 else clusterName(cluster,nreads)
             namefile.write(f'>{name}\n')
             namefile.write('\n'.join(reads.index) + '\n')
 
@@ -64,7 +65,7 @@ def main(args):
         fig = plotReads(data,clusterIdx)
         fig.savefig(f'{args.prefix}.clusters.png')
 
-    return None
+    return data,result
 
 def printParams(model):
     return '\n'.join(['\t' + '='.join(map(str,v)) for v in model.defaults.items()])

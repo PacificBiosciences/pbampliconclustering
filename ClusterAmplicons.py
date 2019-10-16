@@ -16,6 +16,7 @@ DEFAULTMINREADS = 5
 DEFAULTCOMP     = 2
 DEFAULTEPS      = 0.0
 DEFAULTSIMP     = 0.0
+DEFAULTTRIM     = 0.1
 DEFAULTPREFIX   = './clustered'
 
 parser      = argparse.ArgumentParser(prog='ClusterAmplicons.py', description='Clustering by kmer counts')
@@ -40,6 +41,8 @@ kmer.add_argument('-z,--minimizer', dest='minimizer', type=int, default=0,
                 help='group kmers by minimizer of length z. Default 0 (no minimizer)')
 kmer.add_argument('-H,--noHPcollapse', dest='hpCollapse', action='store_false', default=True,
                 help='do not compress homopolymers.  Default collapse HP')
+kmer.add_argument('-T','--trim', dest='trim', type=float, default=DEFAULTTRIM,
+                help=f'Trim kmers with frequency < trim. Default {DEFAULTTRIM:.2f}')
 clust = parser_main.add_argument_group('cluster')
 clust.add_argument('-M,--model', dest='model', type=str, choices=MODELS.keys(), default=DEFAULTMODEL,
                 help=f'clustering model. See https://scikit-learn.org/stable/modules/clustering.html. Default {DEFAULTMODEL}')
@@ -56,7 +59,7 @@ clust.add_argument('-n,--normalize', dest='normalize', type=str, choices=['l1','
 clust.add_argument('-i,--ignoreEnds', dest='ignoreEnds', type=int, default=0,
                 help='ignore i bases at ends of amplicons for clustering.  Default 0')
 clust.add_argument('-P,--params', dest='params', type=str, default=None,
-                help='json file of parameters for specific model. Order of precedence: CL-opts > json > defaults. Default None')
+                help='json file of parameters for specific model. Order of precedence: json > CL-opts > defaults. Default None')
 filt = parser_main.add_argument_group('filter')
 filt.add_argument('-r,--region', dest='region', type=str, default=None,
                 help='Target region for selection of reads, format \'[chr]:[start]-[stop]\'.  Example \'4:3076604-3076660\'. \nDefault all reads (no region)')
@@ -64,8 +67,8 @@ filt.add_argument('--extractReference', dest='reference', type=str, default=None
                 help='Extract subsequence at region coordinates for clustering using fasta reference (must have .fai). Maps 100nt on either side of region to each read and extracts sequence inbetween for kmer counting. \nDefault None (use full read)')
 filt.add_argument('-q,--minQV', dest='minQV', type=float, default=0.99,
                 help='Minimum quality [0-1] to use for clustering. Default 0.99')
-filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,
-                help=f'Dominance filter for kmers.  Remove kmers with > s (dominance). Default {DEFAULTSIMP:.2f} (no filter)')
+#filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,
+#                help=f'Dominance filter for kmers.  Remove kmers with > s (dominance). Default {DEFAULTSIMP:.2f} (no filter)')
 filt.add_argument('-w,--whitelist', dest='whitelist', type=str, default=None,
                 help='whitelist of read names to cluster. Default None')
 filt.add_argument('-f,--flanks', dest='flanks', type=str, default=None,

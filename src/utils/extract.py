@@ -37,8 +37,9 @@ def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flan
                 continue
             rStart,rStop,subseq = extractRepeat(rec.query_sequence,aligner)
             if rStart and rStop:
+                name = f'{rec.query_name}/{rStart}_{rStop}'
                 qual = rec.query_qualities[rStart:rStop]
-                yield SimpleRecord(rec.query_name,subseq,qual,rec.flag)
+                yield SimpleRecord(name,subseq,qual,rec.flag)
     finally:
         os.remove(tmp.name)
 
