@@ -15,9 +15,10 @@ class ClusterModel:
     
     returns : parameterized model instance with fit method 
     '''
-    defaults = {}
-    pmap     = {}
-    MODEL    = None
+    MODEL     = None
+    defaults  = {}
+    pmap      = {}
+    exemplars = None
 
     def __init__(self,args):
         #load CL args first to override defaults
@@ -47,11 +48,13 @@ class ClusterModel_wNoise(ClusterModel):
     '''
     def __init__(self,args):
         self.minCnt = args.minReads
+        self._noiseLabels = []
         super().__init__(args)
     def fit(self,X):
         res = self.model.fit(X)
         for val,count in Counter(res.labels_).items():
             if count < self.minCnt:
+                self._noiseLabels.extend(np.where(res.labels_==val)[0])
                 res.labels_[res.labels_==val] = -1
         return res
 
@@ -98,13 +101,14 @@ class Aggcluster(ClusterModel_wNoise):
 
 class Affprop(ClusterModel_wNoise):
     MODEL    = AffinityPropagation
-    defaults = {'damping' : 0.5}
-    pmap     = {'eps'     : 'damping'}
+    defaults = {'preference' : None, #median of inputs
+                'damping'    : 0.5}
+    pmap     = {'eps'     : 'preference'}
 
-    def __init__(self,args):
-        if args.eps and (args.eps < 0.5 or args.eps >1):
-            raise Clustering_Exception('Damping (-e) must be in [0.5-1] for AffinityPropagation')
-        super().__init__(args)
+    #def __init__(self,args):
+    #    if args.eps and (args.eps < 0.5 or args.eps >1):
+    #        raise Clustering_Exception('Damping (-e) must be in [0.5-1] for AffinityPropagation')
+    #    super().__init__(args)
 
 class Meanshift(ClusterModel):
     MODEL    = MeanShift

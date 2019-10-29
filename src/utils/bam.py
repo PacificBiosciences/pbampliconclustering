@@ -1,4 +1,4 @@
-import pysam
+import pysam,re
 import seaborn as sns
 import numpy as np
 

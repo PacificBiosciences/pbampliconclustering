@@ -6,7 +6,7 @@ from src.utils.clust import clusterName
 
 DEFAULTCI= [0.025,0.975] #95%
 
-def countMotifs(motifs,lengthField=False):
+def countMotifs(motifs,lengthField=None):
     ''' takes a list of motifs
         returns a function that takes a sequence and returns a dict of counts
         optionally includes length of seq in output
@@ -58,4 +58,4 @@ def clusterStats(motifCounts,clusterIdx,outColumns,
     names = clusterSize.reset_index().apply(clusterName,axis=1)
     results.index = names.values
 
-    return results
+    return results.sort_values(('Read','count'),ascending=False)

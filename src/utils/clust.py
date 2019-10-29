@@ -6,7 +6,10 @@ def clusterName(vals):
     return f'cluster{vals[0]}_numreads{vals[1]}'
 
 def getCluster(name):
-    return int(re.search('cluster(\d+)',name).group(1))
+    try:
+        return int(re.search('cluster(\d+)',name).group(1))
+    except AttributeError:
+        return -1 #noise
 
 def readClusterFile(clustfile,nFields=3):
     '''
@@ -20,7 +23,7 @@ def readClusterFile(clustfile,nFields=3):
             if line.startswith('>'):
                 cluster = getCluster(line[1:])
             else:
-                fields = line.split('/') 
+                fields = line.strip().split('/') 
                 read   = '/'.join(fields[:nFields]) if nFields else line.strip()
                 try: #get subset of sequence if fourth field has {start}_{stop}
                     start,stop = map(int,fields[3].split('_'))

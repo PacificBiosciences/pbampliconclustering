@@ -24,10 +24,10 @@ def main(args):
                      agg        =args.agg,
                      extractRef =args.reference)
 
+    #Plot k-nearest neighbors
     if args.testPlot:
-        #plot kdist and exit
         from src.figures.kdist import plotEPS
-        print("Plotting distance to m-neighbors")
+        print(f"Plotting distance to {args.minReads} neighbors")
         f = plotEPS(data,args.minReads,args.normalize)
         f.savefig(f'{args.prefix}.eps_estimator.png')
         return data
@@ -44,28 +44,35 @@ def main(args):
     #write cluster file
     with open(f'{args.prefix}.clusters.txt', 'w') as namefile:
         grouped = data.groupby(clusterIdx)
-        cnts    = sorted([len(idx) for c,idx in grouped.groups.items() if c!=-1],reverse=True)
+        cnts    = sorted([len(idx) for c,idx in grouped if c!=-1],reverse=True)
         print(f'Writing {len(cnts)} clusters with nreads {",".join(map(str,cnts))}')
         if -1 in grouped.groups:
             print(f'{len(grouped.groups[-1])} reads identified as noise')
-        for cluster,reads in grouped:
+        for clust,reads in grouped:
             nreads = len(reads)
-            name = f'Noise_numreads{nreads}' if cluster==-1 else clusterName(cluster,nreads)
+            name = f'Noise_numreads{nreads}' if clust==-1 else clusterName((clust,nreads))
             namefile.write(f'>{name}\n')
             namefile.write('\n'.join(reads.index) + '\n')
 
+    #tag BAM
     if not args.noBam:
         print("Adding HP tag to bam")
-        clusterMap = dict(zip(data.index,clusterIdx))
+        names      = data.index.map(stripReadname)
+        clusterMap = dict(zip(names,clusterIdx))
         outBam     = f'{args.prefix}.hptagged.bam'
         addHPtag(args.inBAM,outBam,clusterMap,dropNoClust=args.drop,splitBam=args.splitBam)
 
+    #plot samples
     if args.plotReads:
         from src.figures.cluster import plotReads
         fig = plotReads(data,clusterIdx)
         fig.savefig(f'{args.prefix}.clusters.png')
 
-    return data,result
+    return data,cluster,result
+
+def stripReadname(readname):
+    '''strip off all but <movie>/<zmw>/ccs'''
+    return '/'.join(readname.split('/')[:3])
 
 def printParams(model):
     return '\n'.join(['\t' + '='.join(map(str,v)) for v in model.defaults.items()])

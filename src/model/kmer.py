@@ -1,6 +1,6 @@
 import re,pysam
-from collections import Counter
-from multiprocessing import Pool,cpu_count
+from collections import defaultdict
+from multiprocessing import Pool,Manager,cpu_count
 import pandas as pd
 import numpy as np
 import mappy as mp
@@ -8,9 +8,8 @@ import skbio.diversity.alpha as ad
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
-from .models import Clustering_Exception
-from ..utils.extract import getCoordinates, \
-                            extractRegion
+#from ..utils.extract import getCoordinates, \
+#                            extractRegion
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
@@ -71,9 +70,6 @@ def loadKmers(inBAM,qual,k,nproc=0,
     else:
         recGen = bam
 
-    counter = kmerCounter(k,collapseHP=collapse,
-                          minimizer=minimizer,
-                          ignoreEnds=ignoreEnds)
     if whitelist:
         wl      = open(whitelist).read().split()
         useRead = (lambda read: read in wl)
@@ -83,19 +79,24 @@ def loadKmers(inBAM,qual,k,nproc=0,
     flankCrit   = getFlankCrit(flanks) if flanks else noFilter
 
     print("Reading Sequence")
-    proc = nproc if nproc else cpu_count()
-    pool = Pool(proc)
-    records = pool.map(recordMaker(counter),
-                       [(rec.query_name,rec.query_sequence) for rec in recGen 
-                        if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)])
-    #records = [recordMaker(counter)((rec.query_name,rec.query_sequence))
-    #           for rec in recGen 
-    #           if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)]
-    data = pd.concat(records,axis=1,sort=False)\
-             .fillna(0).astype(int).T
+    sequences =  pd.DataFrame([{'qname':rec.query_name,'seq':rec.query_sequence}
+                               for rec in recGen
+                               if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)])    
+
+    counts    = defaultdict(lambda: np.zeros(len(sequences),dtype=np.int16))
+    parser    = seqParser(k,collapseHP=collapse,
+                          minimizer=minimizer,
+                          ignoreEnds=ignoreEnds)
+    for i,seq in enumerate(sequences.seq):
+        for kmer in parser(seq):
+            counts[kmer][i] +=1
+
+    data = pd.DataFrame(np.array(list(counts.values())).T,
+                        index=sequences.qname)
 #    if simpson>0:
 #        print('Filtering by dominance')
 #        data = simpsonFilter(data,simpson)
+
     if trim:
         print("Trimming low-freq kmers")
         freqs = data.sum()/len(data)
@@ -119,7 +120,7 @@ def loadKmers(inBAM,qual,k,nproc=0,
 
     return data
 
-class kmerCounter:
+class seqParser:
     def __init__(self,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
         self.k         = k
         self.transform = hpCollapse if collapseHP else ident
@@ -128,8 +129,38 @@ class kmerCounter:
         self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
     def __call__(self, seq):
         s = self.transform(seq[self.start:self.end])
-        return Counter(self.minim(s[i:i+self.k]) for i in range(len(s)-self.k))
-    
+        for i in range(len(s)-self.k):
+            yield self.minim(s[i:i+self.k])
+
+#class kmerCounter:
+#    def __init__(self,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
+#        self.k         = k
+#        self.transform = hpCollapse if collapseHP else ident
+#        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
+#        self.start     = ignoreEnds
+#        self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
+#    def __call__(self, seq):
+#        s = self.transform(seq[self.start:self.end])
+#        return Counter(self.minim(s[i:i+self.k]) for i in range(len(s)-self.k))
+
+class kmerCounter2:
+    def __init__(self,size,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
+        self.size      = size
+        self.k         = k
+        self.transform = hpCollapse if collapseHP else ident
+        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
+        self.start     = ignoreEnds
+        self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
+    def __call__(self, i, seq, multiDict):
+        s = self.transform(seq[self.start:self.end])
+        for j in range(len(s)-self.k):
+            kmer = self.minim(s[j:j+self.k])
+            if kmer not in multiDict:
+                multiDict[kmer] = np.zeros(self.size,int)
+            arr = multiDict[kmer]
+            arr[i] +=1
+            multiDict[kmer] = arr
+            print(f'adding {i}:{arr[:i+1]}  :  {kmer} {multiDict[kmer][:i+1]}')
 
 class recordMaker:
     def __init__(self, counter):

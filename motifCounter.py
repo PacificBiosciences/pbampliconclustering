@@ -34,6 +34,8 @@ def seqGen(bamfile,clusterDf,extract=False):
     parse = (lambda seq,s,e:seq[s:e]) if extract else (lambda seq,s,e:seq)
     for rec in bam:
         if rec.query_name in clusterDf.index:
+            if clusterDf.loc[rec.query_name,'cluster'] == -1:
+                continue #skip noise
             s,e = clusterDf.loc[rec.query_name,['start','stop']]
             yield rec.query_name,parse(rec.query_sequence,s,e)
 
