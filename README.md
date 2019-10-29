@@ -15,6 +15,7 @@ Under Construction
 
 Describe defaults and CL => KW argument map
 
+    $ py3 ClusterAmplicons.py describe -M dbscan
     -----------------DBSCAN-----------------
     ArgMap:
                      eps => eps
