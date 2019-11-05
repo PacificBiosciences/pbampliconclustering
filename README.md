@@ -1,4 +1,4 @@
-# Tools for clustering of Pacific Biosciences CCS reads
+# Tools for clustering of PacBio CCS reads
 
 This repo contains python3 tools to cluster PB CCS reads using kmer counts and clustering algorithms provided by the [Python Scikit-learn machine learning toolset](https://scikit-learn.org/stable/index.html).  The primary use case is for amplicon data, where reads cover a specific region in a reference dataset, however, options are provided to cluster any mapped sequence data covering a defined region in a reference sequence (i.e. WGS data).
 
