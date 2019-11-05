@@ -1,4 +1,22 @@
-Under Construction
+# Tools for clustering of Pacific Biosciences CCS reads
+
+This repo contains python3 tools to cluster PB CCS reads using kmer counts and clustering algorithms provided by the [Python Scikit-learn machine learning toolset](https://scikit-learn.org/stable/index.html).  The primary use case is for amplicon data, where reads cover a specific region in a reference dataset, however, options are provided to cluster any mapped sequence data covering a defined region in a reference sequence (i.e. WGS data).
+
+## Dependencies
+
+Python 3 is used to take full advantage of the scikit-learn library.  The following packages are required:
+ * [scikit-learn](https://scikit-learn.org/stable/install.html)
+ * [numpy](https://numpy.org/)
+ * [pandas](https://pandas.pydata.org/)
+ * [mappy](https://pypi.org/project/mappy/)
+ * [matplotlib](https://matplotlib.org/)
+ * [seaborn](https://seaborn.pydata.org/)
+
+## Quickstart
+
+The clustering tool has two sub-tools.  The first, `describe`, is used for describing the available clustering algorithms and the mapping between command-line options and tool options.  
+
+The second tool, `cluster`, is the primary clustering tool for grouping and labeling CCS reads.
 
     $ py3 ClusterAmplicons.py -h
     usage: ClusterAmplicons.py [-h] {cluster,describe} ...
@@ -13,7 +31,7 @@ Under Construction
         cluster           cluster reads
         describe          describe models
 
-Describe defaults and CL => KW argument map
+Describe defaults and CL => KW argument map.  Us the -M option for a specific tool, or no arguments to see rules for all clustering algorithms.  Details of what each algorithm accepts can be found on the [web site](https://scikit-learn.org/stable/modules/clustering.html#clustering). 
 
     $ py3 ClusterAmplicons.py describe -M dbscan
     -----------------DBSCAN-----------------
@@ -27,12 +45,14 @@ Describe defaults and CL => KW argument map
                   metric => euclidean
                   n_jobs => 2
 
-Clustering Reads
+The full set of options for any clustering algorithm can be accessed using `.json` a configuration file passed to the option `-P` (see below).
+
+Clustering Reads.  Options and examples discussed below.
 
     $ py3 ClusterAmplicons.py cluster -h
     usage: ClusterAmplicons.py cluster [-h] [-j,--njobs NJOBS] [-k,--kmer KMER]
                                        [-z,--minimizer MINIMIZER]
-                                       [-H,--noHPcollapse]
+                                       [-H,--noHPcollapse] [-T TRIM]
                                        [-M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}]
                                        [-a,--agg {pca,featagg}]
                                        [-c,--components COMPONENTS] [-e,--eps EPS]
@@ -42,7 +62,6 @@ Clustering Reads
                                        [-P,--params PARAMS] [-r,--region REGION]
                                        [--extractReference REFERENCE]
                                        [-q,--minQV MINQV]
-                                       [-s,--simpsonDominance SIMPSON]
                                        [-w,--whitelist WHITELIST]
                                        [-f,--flanks FLANKS] [-p,--prefix PREFIX]
                                        [-S,--splitBam] [-x,--noBam] [-d,--drop]
@@ -62,6 +81,7 @@ Clustering Reads
                             group kmers by minimizer of length z. Default 0 (no
                             minimizer)
       -H,--noHPcollapse     do not compress homopolymers. Default collapse HP
+      -T TRIM, --trim TRIM  Trim kmers with frequency < trim. Default 0.10
     
     cluster:
       -M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}
@@ -82,7 +102,7 @@ Clustering Reads
                             ignore i bases at ends of amplicons for clustering.
                             Default 0
       -P,--params PARAMS    json file of parameters for specific model. Order of
-                            precedence: CL-opts > json > defaults. Default None
+                            precedence: json > CL-opts > defaults. Default None
     
     filter:
       -r,--region REGION    Target region for selection of reads, format
@@ -96,9 +116,6 @@ Clustering Reads
                             None (use full read)
       -q,--minQV MINQV      Minimum quality [0-1] to use for clustering. Default
                             0.99
-      -s,--simpsonDominance SIMPSON
-                            Dominance filter for kmers. Remove kmers with > s
-                            (dominance). Default 0.00 (no filter)
       -w,--whitelist WHITELIST
                             whitelist of read names to cluster. Default None
       -f,--flanks FLANKS    fasta of flanking/primer sequence. Reads not mapping
@@ -115,6 +132,42 @@ Clustering Reads
                             clustering
       -g,--plotReads        Plot first 2 axes of PCA for each read. Default no
                             plot generated
+## Region Selection
+Clustering can occur for all reads, a subset of reads, or over a defined reference window spanned by a subset of reads.  By default, all sequence in the input bam will be characterized by kmer counts and clustered.  
 
- 
+If a *region* is provided without an _extractReference_, then all reads intersecting the region (returned by pysam _fetch_ method) will be characterized and clustered.
+
+If a *region* and *extractReference* are both provided, then only the sequence between the reference coordinates is clustered from reads completely spanning the region.  Sequence between region coordinates is extracted by mapping 100bp of flanking sequence from the reference to each mapped read returned by pysam _fetch_.   
+
+### Filtering
+Reads are filtered by minimum read quality `-q` [0-1].  For extracted sequence, the QV filter is applied to the extracted sequence only. 
+
+Primer sequences can be supplied to filter artifacts.  Reads will only be included in clustering analysis of both primers occur in the read.
+
+## Clustering
+Clustering is based on kmer count vectors for each read in the input dataset, following region selection and filtering.  
+
+### Kmers
+By default homopolymer stretches (n>=2) are compressed prior to kmer counting.  This step reduces noise caused by one of the primary sources of error in PB sequencing.  This option can be turned off with the `-H` option.  
+
+Kmers can be grouped by a _minimizer_ of size `-z`.  This is a naive implementation that labels all kmers by the first lexicographically sorted substring of length _z_.  
+
+Kmers of frequency < `-T` in the dataset will be removed prior to clustering.  These are generally noise anyways.
+
+### Feature Reduction
+PCA or feature agglomeration can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determined the number of used components (PCA) or output features ([featagg](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration)).  Setting the number of components to 0 turns off feature reduction.
+
+### Normalize
+Kmer counts are normalized _within samples_ unless `-n` is set to `none`.
+
+### Ignore Ends
+To avoid clustering reads based on degenerate primers, this option can be set to ignore sequence `-i` bases from the ends of each read.
+
+### Minimum Cluster size
+Clusters must have at least `-m` reads.  Clusters with less than `-m` reads will be reclassified as _noise_.  
+
+### Custom Parameters
+A simple json file can be provided to set all options for any algorithm.  The json config file trumps all other input parameters (ie defaults and CL options).
+
+
 THIS WEBSITE AND CONTENT AND ALL SITE-RELATED SERVICES, INCLUDING ANY DATA, ARE PROVIDED "AS IS," WITH ALL FAULTS, WITH NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, ANY WARRANTIES OF MERCHANTABILITY, SATISFACTORY QUALITY, NON-INFRINGEMENT OR FITNESS FOR A PARTICULAR PURPOSE. YOU ASSUME TOTAL RESPONSIBILITY AND RISK FOR YOUR USE OF THIS SITE, ALL SITE-RELATED SERVICES, AND ANY THIRD PARTY WEBSITES OR APPLICATIONS. NO ORAL OR WRITTEN INFORMATION OR ADVICE SHALL CREATE A WARRANTY OF ANY KIND. ANY REFERENCES TO SPECIFIC PRODUCTS OR SERVICES ON THE WEBSITES DO NOT CONSTITUTE OR IMPLY A RECOMMENDATION OR ENDORSEMENT BY PACIFIC BIOSCIENCES.

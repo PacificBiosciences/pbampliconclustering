@@ -60,7 +60,7 @@ def main(args):
         names      = data.index.map(stripReadname)
         clusterMap = dict(zip(names,clusterIdx))
         outBam     = f'{args.prefix}.hptagged.bam'
-        addHPtag(args.inBAM,outBam,clusterMap,dropNoClust=args.drop,splitBam=args.splitBam)
+        addHPtag(args.inBAM,outBam,clusterMap,region=args.region,dropNoClust=args.drop,splitBam=args.splitBam)
 
     #plot samples
     if args.plotReads:

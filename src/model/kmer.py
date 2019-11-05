@@ -8,8 +8,8 @@ import skbio.diversity.alpha as ad
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
-#from ..utils.extract import getCoordinates, \
-#                            extractRegion
+from ..utils.extract import getCoordinates, \
+                            extractRegion
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):

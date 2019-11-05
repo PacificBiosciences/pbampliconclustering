@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from src.utils.clust import readClusterFile
 from src.utils.motif import getCounts,clusterStats
+from src.utils.extract import getCoordinates
 
 DEFAULTNAME='./motif.summary.csv'
 DEFAULTLF  ='totalBp'
@@ -17,7 +18,7 @@ def main(parser):
             print('WARNING: using full read sequence for motif counting')
     else:
         extract = True
-    seqs        = seqGen(args.inBAM,clusters,extract)
+    seqs        = seqGen(args.inBAM,clusters,extract=extract,region=args.region)
     motifs      = args.motifs.split(',')
     motifCounts = getCounts(seqs,motifs,lengthField=DEFAULTLF)
     clusterIdx  = motifCounts.index.map(clusters.cluster.to_dict())
@@ -29,10 +30,11 @@ def main(parser):
 
     return results
 
-def seqGen(bamfile,clusterDf,extract=False):
+def seqGen(bamfile,clusterDf,extract=False,region=None):
     bam = pysam.AlignmentFile(bamfile)
+    gen = bam.fetch(*getCoordinates(region)) if region else bam
     parse = (lambda seq,s,e:seq[s:e]) if extract else (lambda seq,s,e:seq)
-    for rec in bam:
+    for rec in gen:
         if rec.query_name in clusterDf.index:
             if clusterDf.loc[rec.query_name,'cluster'] == -1:
                 continue #skip noise
@@ -59,6 +61,8 @@ if __name__ == '__main__':
                     help='Seed for resampling confidence interval.  Default 42')
     parser.add_argument('-f,--full', dest='full', action='store_true', default=False,
                     help='Count motifs for full read.  Default False (try to extract subsequence if defined in cluster.txt)')
+    parser.add_argument('-r,--region', dest='region', type=str, default=None,
+                    help='Region (for filtering inout only). Default None')
 
     try:
         main(parser)

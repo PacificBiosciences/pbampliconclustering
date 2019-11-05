@@ -14,6 +14,8 @@ class SimpleRecord:
     def _getQual(self,phred):
         return mean([1-10**(-q/10) for q in phred])
     def get_tag(self,tag):
+        if tag != 'rq':
+            raise Extract_Exception(f'tag {tag} not available')
         return self.rq
 
 def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flanksize=100):

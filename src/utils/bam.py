@@ -1,13 +1,14 @@
 import pysam,re
 import seaborn as sns
 import numpy as np
+from .extract import getCoordinates
 
 PALETTE     ='husl'
 NOCLUST     =999
 NOCLUSTCOLOR='255,255,255'
 NOISECOLOR  ='200,200,200'
 
-def addHPtag(inBAM,outBAM,clusterMap,splitBam=False,noCluster=NOCLUST,dropNoClust=False):
+def addHPtag(inBAM,outBAM,clusterMap,region=None,splitBam=False,noCluster=NOCLUST,dropNoClust=False):
     '''clusterMap is map of {readname:cluster::int}'''
     cvals   = set(clusterMap.values())
     ncolors = len(cvals)
@@ -32,7 +33,8 @@ def addHPtag(inBAM,outBAM,clusterMap,splitBam=False,noCluster=NOCLUST,dropNoClus
             outbam = pysam.AlignmentFile(outBAM,'wb',template=inbam)
             outMap = {c:outbam for c in cvals.union([noCluster])}
         getbam = (lambda c: outMap[c])
-        for rec in inbam:
+        recGen = inbam.fetch(*getCoordinates(region)) if region else inbam
+        for rec in recGen:
             if dropNoClust:
                 if rec.query_name not in clusterMap: #filtered
                     continue
