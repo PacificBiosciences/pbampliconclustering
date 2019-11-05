@@ -1,6 +1,6 @@
 # Tools for clustering of PacBio CCS reads
 
-This repo contains python3 tools to cluster PB CCS reads using kmer counts and clustering algorithms provided by the [Python Scikit-learn machine learning toolset](https://scikit-learn.org/stable/index.html).  The primary use case is for amplicon data, where reads cover a specific region in a reference dataset, however, options are provided to cluster any mapped sequence data covering a defined region in a reference sequence (i.e. WGS data).
+This repo contains python3 tools to cluster PB CCS reads using kmer counts and clustering algorithms provided by the [Python Scikit-learn machine learning toolset](https://scikit-learn.org/stable/index.html).  The primary use case is for amplicon data, where reads cover a specific region in a reference dataset. For non-targeted data, options are provided to cluster any mapped sequence data covering a defined region in a reference sequence (i.e. WGS data).
 
 ## Dependencies
 
@@ -8,6 +8,7 @@ Python 3 is used to take full advantage of the scikit-learn library.  The follow
  * [scikit-learn](https://scikit-learn.org/stable/install.html)
  * [numpy](https://numpy.org/)
  * [pandas](https://pandas.pydata.org/)
+ * [pysam](https://pysam.readthedocs.io/en/latest/api.html)
  * [mappy](https://pypi.org/project/mappy/)
  * [matplotlib](https://matplotlib.org/)
  * [seaborn](https://seaborn.pydata.org/)
@@ -145,9 +146,9 @@ If a *region* is provided without an _extractReference_, then all reads intersec
 If a *region* and *extractReference* are both provided, then only the sequence between the reference coordinates is clustered from reads completely spanning the region.  Sequence between region coordinates is extracted by mapping 100bp of flanking sequence from the reference to each mapped read returned by pysam _fetch_.   
 
 ### Filtering
-Reads are filtered by minimum read quality `-q` [0-1].  For extracted sequence, the QV filter is applied to the extracted sequence only. 
+Reads are filtered by minimum read quality `-q` [0-1], default `0.99`.  For extracted sequence, the QV filter is applied to the extracted sequence only. 
 
-Primer sequences can be supplied to filter artifacts.  Reads will only be included in clustering analysis of both primers occur in the read.
+Primer sequences can be supplied to filter artifacts.  Reads will only be included in clustering analysis if both primers occur in the read.
 
 ## Clustering
 Clustering is based on kmer count vectors for each read in the input dataset, following region selection and filtering.  
@@ -160,10 +161,10 @@ Kmers can be grouped by a _minimizer_ of size `-z`.  This is a naive implementat
 Kmers of frequency less than `-T` in the dataset will be removed prior to clustering.
 
 ### Feature Reduction
-PCA or feature agglomeration can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determines the number of used components (PCA) or output features ([featagg](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration)).  Setting the number of components to 0 turns off feature reduction.
+[PCA](https://scikit-learn.org/stable/modules/decomposition.html#principal-component-analysis-pca) or [feature agglomeration](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration) can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determines the number of used components (PCA) or output features (featagg).  Setting the number of components to 0 turns off feature reduction.
 
 ### Normalize
-Kmer counts are normalized _within samples_ unless `-n` is set to `none`.
+Kmer counts are [normalized](https://scikit-learn.org/stable/modules/preprocessing.html#normalization) _within samples_ unless `-n` is set to `none`.
 
 ### Ignore Ends
 To avoid clustering reads based on degenerate primers, this option can be set to ignore sequence `-i` bases from the ends of each read.
@@ -172,7 +173,7 @@ To avoid clustering reads based on degenerate primers, this option can be set to
 Clusters must have at least `-m` reads.  Clusters with less than `-m` reads will be reclassified as _noise_.  
 
 ### Custom Parameters
-A simple json file can be provided to set all options for any algorithm.  The json config file trumps all other input parameters (ie defaults and CL options).
+A simple json file can be provided to set all options for any clustering algorithm.  The json config file trumps all other input parameters (ie defaults and CL options).  See [example json file](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/optics_config.json) for the OPTICS algorithm.
 
 ## Outputs
 ### clusters.txt
@@ -201,7 +202,7 @@ Cluster numbers are inserted into each row of the output BAM using the `HP` tag.
 For some clustering algorithms (e.g. DBSCAN), it can be useful to view a plot of sorted nearest neightbor distances to set the _eps_ value.  The option `-t` generates such a plot for a given parameter set and read input.
 
 ### Cluster Plot
-The option `-g` generates a plot of each reads' position give then first 2 reduced components from the input matrix.
+The option `-g` generates a plot of each read position given the first 2 reduced components from the input matrix.
 
 
 
