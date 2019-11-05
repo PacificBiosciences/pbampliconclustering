@@ -14,7 +14,7 @@ Python 3 is used to take full advantage of the scikit-learn library.  The follow
 
 ## Quickstart
 
-click here for an [example walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/README.md). 
+Click here for an [example walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/README.md). 
 
 The clustering tool has two sub-tools.  The first, `describe`, is used for describing the available clustering algorithms and the mapping between command-line options and tool options.  
 
