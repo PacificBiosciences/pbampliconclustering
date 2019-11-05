@@ -31,7 +31,9 @@ The second tool, `cluster`, is the primary clustering tool for grouping and labe
         cluster           cluster reads
         describe          describe models
 
-Describe defaults and CL => KW argument map.  Us the -M option for a specific tool, or no arguments to see rules for all clustering algorithms.  Details of what each algorithm accepts can be found on the [web site](https://scikit-learn.org/stable/modules/clustering.html#clustering). 
+### Describe Model Inputs
+
+Describe defaults and CL => KW argument map.  Us the -M option for a specific tool, or no arguments to see rules for all clustering algorithms.  Details of what each algorithm accepts can be found on the [scikit-learn web site](https://scikit-learn.org/stable/modules/clustering.html#clustering). 
 
     $ py3 ClusterAmplicons.py describe -M dbscan
     -----------------DBSCAN-----------------
@@ -47,7 +49,8 @@ Describe defaults and CL => KW argument map.  Us the -M option for a specific to
 
 The full set of options for any clustering algorithm can be accessed using `.json` a configuration file passed to the option `-P` (see below).
 
-Clustering Reads.  Options and examples discussed below.
+### Cluster Reads
+Options and examples discussed below.
 
     $ py3 ClusterAmplicons.py cluster -h
     usage: ClusterAmplicons.py cluster [-h] [-j,--njobs NJOBS] [-k,--kmer KMER]
@@ -168,6 +171,38 @@ Clusters must have at least `-m` reads.  Clusters with less than `-m` reads will
 
 ### Custom Parameters
 A simple json file can be provided to set all options for any algorithm.  The json config file trumps all other input parameters (ie defaults and CL options).
+
+## Outputs
+### clusters.txt
+The primary output is a text file listing reads in each output cluster.  Reads have their original name, unless the `--extracReference` option is used to extract a subsequence from each read, in which case the extraction coordinates will be appended to the read names.
+
+    >cluster0_numreads42
+    m54309_190912_232752/34538433/ccs
+    m54309_190912_232752/64291805/ccs
+    m54309_190912_232752/70058377/ccs
+    ...
+    >cluster1_numreads31
+    m54309_190912_232752/8847473/ccs
+    m54309_190912_232752/40436366/ccs
+    m54309_190912_232752/41288675/ccs
+    ...
+    >Noise_numreads2
+    m54309_190912_232752/45744303/ccs
+    m54309_190912_232752/47055558/ccs
+
+Reads filtered prior to clustering are *not* listed.
+
+### HP-tagged BAM
+Cluster numbers are inserted into each row of the output BAM using the `HP` tag.  If the `-d` option is passed, only clustered reads will be included in the output.  Otherwise, filtered reads are labeled `999` and reads that enter the clustering process but are classified as _noise_ are labeled `-1`.  All output reads also have an RGB color defined by cluster in the `YC` tag for visualization in IGV.  The option `-S` generates a single BAM output per cluster, and `-x` will prevent any bam output from being written.
+
+### Nearest Neighbor plot
+For some clustering algorithms (e.g. DBSCAN), it can be useful to view a plot of sorted nearest neightbor distances to set the _eps_ value.  The option `-t` generates such a plot for a given parameter set and read input.
+
+### Cluster Plot
+The option `-g` generates a plot of each reads' position give then first 2 reduced components from the input matrix.
+
+
+
 
 
 THIS WEBSITE AND CONTENT AND ALL SITE-RELATED SERVICES, INCLUDING ANY DATA, ARE PROVIDED "AS IS," WITH ALL FAULTS, WITH NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, ANY WARRANTIES OF MERCHANTABILITY, SATISFACTORY QUALITY, NON-INFRINGEMENT OR FITNESS FOR A PARTICULAR PURPOSE. YOU ASSUME TOTAL RESPONSIBILITY AND RISK FOR YOUR USE OF THIS SITE, ALL SITE-RELATED SERVICES, AND ANY THIRD PARTY WEBSITES OR APPLICATIONS. NO ORAL OR WRITTEN INFORMATION OR ADVICE SHALL CREATE A WARRANTY OF ANY KIND. ANY REFERENCES TO SPECIFIC PRODUCTS OR SERVICES ON THE WEBSITES DO NOT CONSTITUTE OR IMPLY A RECOMMENDATION OR ENDORSEMENT BY PACIFIC BIOSCIENCES.
