@@ -155,10 +155,10 @@ By default homopolymer stretches (n>=2) are compressed prior to kmer counting.  
 
 Kmers can be grouped by a _minimizer_ of size `-z`.  This is a naive implementation that labels all kmers by the first lexicographically sorted substring of length _z_.  
 
-Kmers of frequency < `-T` in the dataset will be removed prior to clustering.  These are generally noise anyways.
+Kmers of frequency less than `-T` in the dataset will be removed prior to clustering.
 
 ### Feature Reduction
-PCA or feature agglomeration can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determined the number of used components (PCA) or output features ([featagg](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration)).  Setting the number of components to 0 turns off feature reduction.
+PCA or feature agglomeration can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determines the number of used components (PCA) or output features ([featagg](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration)).  Setting the number of components to 0 turns off feature reduction.
 
 ### Normalize
 Kmer counts are normalized _within samples_ unless `-n` is set to `none`.

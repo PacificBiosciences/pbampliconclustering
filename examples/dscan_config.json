@@ -1,5 +1,5 @@
 {
-    "eps"       : 0.02,
-    "metric"    : "l1",
-    "algorithm" : "kd_tree"
+    "eps"        : 0.1,
+    "min_samples": 50,
+    "metric"     : "l1"
 }

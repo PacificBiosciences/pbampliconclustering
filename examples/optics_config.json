@@ -4,6 +4,6 @@
     "metric"           : "manhattan",
     "cluster_method"   : "xi",
     "xi"               : 0.1,
-    "eps"              : 0.03,
+    "eps"              : 0.01,
     "n_jobs"           : 8
 }

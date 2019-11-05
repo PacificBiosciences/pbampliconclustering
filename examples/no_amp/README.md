@@ -1,0 +1,158 @@
+# Clustering Expansion Regions
+
+For this example we will use the dataset `bc1019--bc1019.mapped.bam`, which contains CCS reads from four repeat expansion regions sequenced using PacBio [No-Amp targeted sequencing protocol](https://www.pacb.com/applications/targeted-sequencing/no-amp-targeted-sequencing/).  All four targeted regions are contained in a single BAM file.
+
+## Separate Targets by Clustering
+It is not really necessary to separate the targets with clustering when alignment is quicker and easier, however this will serve as an example of clustering all the reads in a bam.
+
+### Plot sorted N nearest neighbors
+This plot can be used to estimate the clustering parameter *eps*.  Here we are looking for large clusters with >50 reads per target.
+
+    $ py3 ClusterAmplicons.py cluster \
+                              -M dbscan \
+                              -k 15 \     
+                              -c 10 \
+                              -m 50 \ 
+                              -t \
+                              -p allTargets50 \
+                              bc1019--bc1019.mapped.bam
+
+![EPS estimator](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/allTargets50.eps_estimator.png)
+
+### Cluster Targets
+We can use the value `0.3` for eps and cluster with DBSCAN to separate targets
+
+    $ py3 ClusterAmplicons.py cluster \
+                              -M dbscan \
+                              -k 15 \
+                              -c 10 \
+                              -m 50 \
+                              -e 0.3 \
+                              -p allTargets50 \
+                              bc1019--bc1019.mapped.bam
+
+This results in 6 clusters for the four targets:
+
+    $ grep '>' allTargets50.clusters.txt 
+    >Noise_numreads124
+    >cluster0_numreads196  # off-target
+    >cluster1_numreads407  # HTT
+    >cluster2_numreads210  # C9orf72
+    >cluster3_numreads268  # ATXN10 
+    >cluster4_numreads151  # FMR1
+    >cluster5_numreads91   # FMR1
+
+## Clustering Alleles
+For amplicons or targeted sequence where the reads cover the same coordinates, we can cluster using kmers generate by the entire read.  
+    
+    $ py3 ClusterAmplicons.py cluster \
+                              -M dbscan \
+                              -k 15 \
+                              -c 4 \
+                              -m 5 \
+                              -e 0.05 \
+                              -r '4:3074408-3247687'\
+                              -p HTT_fullread \
+                              bc1019--bc1019.mapped.bam
+
+This results in two clusters, one for each allele.
+
+    $ grep '>' HTT_fullread.clusters.txt 
+    >Noise_numreads7
+    >cluster0_numreads197
+    >cluster1_numreads204
+
+The reads are colored by cluster in IGV and can be grouped by the tag `HP`.
+![HTT clustered](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/HTT_clustered.png)
+
+## Clustering Alleles by Region
+Sometimes it is desireable to cluster only by a specific region within a read, and not the entire read.  This can be accomplished by including both a region definition and a reference fasta.  When `--extractReference` is passed, the script will attempt to excise sequence between the region coordinates by mapping 100bp of flanking sequence (immediately outside the target coordinates) to each read and cutting out the sequence between.  Each entire read is then clustered based on the contents of just the extracted region.  
+
+In the HTT example, we want to cluster reads by the CAG expansion region only:
+
+    $ py3 ClusterAmplicons.py cluster \
+                              -M dbscan \
+                              -k 15 \
+                              -c 4 \
+                              -m 5 \
+                              -e 0.05 \
+                              -r '4:3076604-3076693'\
+                              --extractReference human_hs37d5.fasta \
+                              -p HTT_extracted \
+                              bc1019--bc1019.mapped.bam
+
+This results in 5 clusters, some of which are noisy reads in the region of the expansion.
+
+    $ grep '>' HTT_extracted.clusters.txt 
+    >Noise_numreads7
+    >cluster0_numreads195
+    >cluster1_numreads179
+    >cluster2_numreads8
+    >cluster3_numreads8
+    >cluster4_numreads7
+
+Names of the clustered reads will include the coordinates of the extracted region that was used for clustering:
+
+    $ awk '/^>/ {print;getline;print}' HTT_extracted.clusters.txt
+    >Noise_numreads7
+    m64012_190806_011308/91163206/ccs/2283_2375
+    >cluster0_numreads195
+    m64012_190806_011308/32768920/ccs/2260_2344
+    >cluster1_numreads179
+    m64012_190806_011308/107676710/ccs/2260_2332
+    >cluster2_numreads8
+    m64012_190806_011308/177603664/ccs/2261_2330
+    >cluster3_numreads8
+    m64012_190806_011308/180289901/ccs/2262_2336
+    >cluster4_numreads7
+    m64012_190806_011308/47448774/ccs/2259_2334
+
+### Repeat Motif Counting
+
+Additionally, for repeat expansion sequencing, a small repeat mofit counting tool is provided:
+
+    $ py3 motifCounter.py -m CAG,CAA \
+                          -o HTT_extracted.motif_counts.csv \
+                          HTT_extracted.clusters.txt \
+                          bc1019--bc1019.mapped.bam
+    
+    $ column -ts, HTT_extracted.motif_counts.csv
+                          CAG     CAG   CAG        CAA     CAA   CAA      totalBp  totalBp  totalBp    Read
+                          median  mean  ci95       median  mean  ci95     median   mean     ci95       count
+    cluster0_numreads195  18      17.9  (17 - 19)  1       1.0   (1 - 1)  84       83.9     (81 - 88)  195
+    cluster1_numreads179  11      11.0  (11 - 11)  1       1.0   (1 - 1)  72       72.1     (72 - 73)  179
+    cluster2_numreads8    10      10.0  (10 - 10)  1       1.0   (1 - 1)  69       69.1     (69 - 70)  8
+    cluster3_numreads8    11      11.0  (11 - 11)  1       1.0   (1 - 1)  75       75.0     (74 - 76)  8
+    cluster4_numreads7    12      12.1  (12 - 13)  1       1.0   (1 - 1)  75       75.6     (75 - 78)  7
+
+## Clustering WGS data by Region
+WGS HiFi/CCS data can also be clustered over defined regions in the same way.  Only reads which completely span the region will be clustered; use the  `-d` option to remove all reads in the output bam that were filtered or classified as noise.  Below the input dataset is a WGC dataset for HG002 mapped to hs37d5:
+
+    $ py3 ClusterAmplicons.py cluster -d \
+                                      -r '4:3076604-3076693' \
+                                      --extractReference human_hs37d5.fasta \
+                                      -H \
+                                      -k 9 \
+                                      -e 0.02 \
+                                      -p wgsHTT \
+                                      HG002.consensusalignments.bam 
+    $ py3 motifCounter.py -m CAG,CAA \
+                          -o HG002.HTT.WGS.motif_counts.csv \
+                          wgsHTT.clusters.txt \
+                          HG002.consensusalignments.bam
+
+    $ column -ts, HG002.HTT.WGS.motif_counts.csv 
+                         CAG     CAG   CAG        CAA     CAA   CAA      totalBp  totalBp  totalBp      Read
+                         median  mean  ci95       median  mean  ci95     median   mean     ci95         count
+    cluster1_numreads11  18      18.0  (18 - 18)  1       1     (1 - 1)  84       84.0     (84 - 84)    11
+    cluster0_numreads7   25      24.9  (24 - 25)  1       1     (1 - 1)  105      104.7    (102 - 106)  7
+
+![WGS HTT Cluster](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/wgsHTT_igv.png)
+
+
+
+
+
+
+
+
