@@ -206,7 +206,7 @@ Cluster numbers are inserted into each row of the output BAM using the `HP` tag.
 ### Nearest Neighbor plot
 For some clustering algorithms (e.g. DBSCAN), it can be useful to view a plot of sorted nearest neightbor distances to set the _eps_ value.  The option `-t` generates such a plot for a given parameter set and read input.
 
-![DRB split](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/allTargets50.eps_estimator.png)
+![EPS Estimator](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/allTargets50.eps_estimator.png)
 
 ### Cluster Plot
 The option `-g` generates a plot of each read position given the first 2 reduced components from the input matrix.
