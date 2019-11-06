@@ -126,7 +126,7 @@ Additionally, for repeat expansion sequencing, a small repeat mofit counting too
     cluster4_numreads7    12      12.1  (12 - 13)  1       1.0   (1 - 1)  75       75.6     (75 - 78)  7
 
 ## Clustering WGS data by Region
-WGS HiFi/CCS data can also be clustered over defined regions in the same way.  Only reads which completely span the region will be clustered; use the  `-d` option to remove all reads in the output bam that were filtered or classified as noise.  Below the input dataset is a WGC dataset for HG002 mapped to hs37d5:
+WGS HiFi/CCS data can also be clustered over defined regions in the same way.  Only reads which completely span the region will be clustered; use the  `-d` option to remove all reads in the output bam that were filtered or classified as noise.  Below the input dataset is a WGS dataset for HG002 mapped to hs37d5:
 
     $ py3 ClusterAmplicons.py cluster -d \
                                       -r '4:3076604-3076693' \
