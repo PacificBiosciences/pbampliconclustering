@@ -4,7 +4,7 @@ This example starts from a single pooled HLA amplicon dataset containing up to 9
     
     A,B,C,DPB1,DQB1,DRB1,DRB3,DRB4,DRB5
 
-The data come from a multiplexed SMRTcell with barcode.  We will look at just one sample, `lbc90--lbc90`.
+The data come from a multiplexed SMRTcell with barcodes.  We will look at just one sample, `lbc90--lbc90`.
 
 ## Separate HLA loci by alignment
 

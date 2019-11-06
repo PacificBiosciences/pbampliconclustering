@@ -16,8 +16,9 @@ Python 3 is used to take full advantage of the scikit-learn library.  The follow
 ## Quickstart
 
 Examples:
-[No-Amp Repeat Expansion walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/README.md)
-[HLA Alleles walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/tree/master/examples/hla/README.md)
+ * [No-Amp Repeat Expansion walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/README.md)
+ * [HTT Repeat Region from WGS HiFi reads](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/README.md#clustering-wgs-data-by-region)
+ * [HLA Alleles walkthrough](https://github.com/PacificBiosciences/pbampliconclustering/tree/master/examples/hla/README.md)
 
 The clustering tool has two sub-tools.  The first, `describe`, is used for describing the available clustering algorithms and the mapping between command-line options and tool options.  
 
@@ -200,13 +201,17 @@ Reads filtered prior to clustering are *not* listed.
 ### HP-tagged BAM
 Cluster numbers are inserted into each row of the output BAM using the `HP` tag.  If the `-d` option is passed, only clustered reads will be included in the output.  Otherwise, filtered reads are labeled `999` and reads that enter the clustering process but are classified as _noise_ are labeled `-1`.  All output reads also have an RGB color defined by cluster in the `YC` tag for visualization in IGV.  The option `-S` generates a single BAM output per cluster, and `-x` will prevent any bam output from being written.
 
+![Cluster alleles](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/igv_3Alleles.png)
+
 ### Nearest Neighbor plot
 For some clustering algorithms (e.g. DBSCAN), it can be useful to view a plot of sorted nearest neightbor distances to set the _eps_ value.  The option `-t` generates such a plot for a given parameter set and read input.
+
+![DRB split](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/allTargets50.eps_estimator.png)
 
 ### Cluster Plot
 The option `-g` generates a plot of each read position given the first 2 reduced components from the input matrix.
 
-
+![DRB split](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/clusterDRB.clusters.png)
 
 
 
