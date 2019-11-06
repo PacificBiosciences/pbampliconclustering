@@ -93,7 +93,6 @@ This results in 5 clusters, some of which are noisy reads in the region of the e
 
 ![HTT clusters](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/HTT_extracted.clusters.png)
 
-
 ![HTT IGV](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/no_amp/HTT_extracted_clustersIGV.png)
 
 Names of the clustered reads will include the coordinates of the extracted region that was used for clustering:
