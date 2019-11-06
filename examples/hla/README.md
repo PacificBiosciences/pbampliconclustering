@@ -1,10 +1,14 @@
 # Clustering CCS reads from Pooled HLA Alleles
 
-This example starts from a single pooled HLA amplicon dataset containing up to 9 loci: A,B,C,DPB1,DQB1,DRB1,DRB3,DRB4,DRB5.  This sample comes from a multiplexed SMRTcell with barcode `lbc90--lbc90`.  
+This example starts from a single pooled HLA amplicon dataset containing up to 9 loci: 
+    
+    A,B,C,DPB1,DQB1,DRB1,DRB3,DRB4,DRB5
 
-## Separate HLA loci my alignment
+The data come from a multiplexed SMRTcell with barcode.  We will look at just one sample, `lbc90--lbc90`.
 
-We use a de-duplicated subset of HLA alleles for separating CCS reads by locus.  This is the same guide fasta used for PacBio `LAA with Guided Clustering`.  CCS reads from barcode lbc90 are aligned to the guide in `mapped.lbc90--lbc90.consensusalignmentset.bam`.  We can identify the HLA-A alleles by whitelisting CCS reads mapped to HLA-A in the guide and clustering.
+## Separate HLA loci by alignment
+
+We use a de-duplicated subset of HLA alleles for separating CCS reads by locus.  This is the same guide fasta used for PacBio [LAA with Guided Clustering](https://github.com/PacificBiosciences/pblaa).  CCS reads from barcode lbc90 are aligned to the guide in `mapped.lbc90--lbc90.consensusalignmentset.bam`.  We can identify the HLA-A alleles by whitelisting CCS reads mapped to HLA-A in the guide and clustering.
 
     $ samtools view -F 0x900 mapped.lbc90--lbc90.consensusalignmentset.bam | awk '/HLA-A/ {print $1}' > A.whitelist
 
@@ -39,6 +43,7 @@ The list of names is used to filter the input dataset and cluster.
 
 The two alleles are easily separated, and noisy reads are removed.
 ![HLA-A Clusters](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/clusterA.clusters.png)
+
 One of the alleles, showing filtered reads in white (removed before clustering) and noise reads in gray (passed filter but not part of a cluster).  Filtered and Noise reads are automatically removed when the option `--splitBam` is used or if the `--drop` flag is present.
 ![HLA-A IGV](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/A_02-06-01.cluster.png) 
 
