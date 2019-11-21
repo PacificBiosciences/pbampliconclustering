@@ -55,7 +55,7 @@ We can generate a quick consensus for cluster `1` using the first clustered read
     $ pbmm2 align --sort --preset CCS clust1_1.fasta clusterA.split.hptagged.1.bam \
         | bcftools mpileup -Q 0 -B -Ou -f clust1_1.fasta - \
         | bcftools call --ploidy 1 -mv -Ob \
-        | bcftools view -i 'QUAL>30' -Ob > clust1_polish.bcf && bcftools index clust1_polish.bcf
+        | bcftools view -i '%QUAL>30' -Ob > clust1_polish.bcf && bcftools index clust1_polish.bcf
     
     $ bcftools consensus -f clust1_1.fasta clust1_polish.bcf > clust1_cons.fasta
 

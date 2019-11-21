@@ -53,7 +53,7 @@ Describe defaults and CL => KW argument map.  Us the -M option for a specific to
                   metric => euclidean
                   n_jobs => 2
 
-The full set of options for any clustering algorithm can be accessed using `.json` a configuration file passed to the option `-P` (see below).
+The full set of options for any clustering algorithm can be accessed using a `.json` configuration file passed to the option `-P` (see below).
 
 ### Cluster Reads
 Options and examples discussed below.
