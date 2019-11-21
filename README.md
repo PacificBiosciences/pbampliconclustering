@@ -73,8 +73,9 @@ Options and examples discussed below.
                                        [-q,--minQV MINQV]
                                        [-w,--whitelist WHITELIST]
                                        [-f,--flanks FLANKS] [-p,--prefix PREFIX]
-                                       [-S,--splitBam] [-x,--noBam] [-d,--drop]
-                                       [-t,--testPlot] [-g,--plotReads]
+                                       [-S,--splitBam] [-x,--noBam] [-F,--fastq]
+                                       [-d,--drop] [-t,--testPlot]
+                                       [-g,--plotReads]
                                        [inBAM]
     
     positional arguments:
@@ -135,12 +136,14 @@ Options and examples discussed below.
       -S,--splitBam         split clusters into separate bams (noise and no-
                             cluster dropped). Default one bam
       -x,--noBam            Do not export HP-tagged bam of clustered reads
+      -F,--fastq            Export one fastq per cluster
       -d,--drop             Drop reads with no cluster in output bam. Default keep
                             all reads.
       -t,--testPlot         Plot reads vs dist to nearest m-neighbors without
                             clustering
       -g,--plotReads        Plot first 2 axes of PCA for each read. Default no
                             plot generated
+
 ## Region Selection
 Clustering can occur for all reads, a subset of reads, or over a defined reference window spanned by a subset of reads.  By default, all sequence in the input bam will be characterized by kmer counts and clustered.  
 
@@ -202,6 +205,9 @@ Reads filtered prior to clustering are *not* listed.
 Cluster numbers are inserted into each row of the output BAM using the `HP` tag.  If the `-d` option is passed, only clustered reads will be included in the output.  Otherwise, filtered reads are labeled `999` and reads that enter the clustering process but are classified as _noise_ are labeled `-1`.  All output reads also have an RGB color defined by cluster in the `YC` tag for visualization in IGV.  The option `-S` generates a single BAM output per cluster, and `-x` will prevent any bam output from being written.
 
 ![Cluster alleles](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/igv_3Alleles.png)
+
+### Fastq per cluster
+Use the `-F` option to export a fastq file per cluster.  This can be used as input for [consensus](https://github.com/armintoepfer/c3s).
 
 ### Nearest Neighbor plot
 For some clustering algorithms (e.g. DBSCAN), it can be useful to view a plot of sorted nearest neightbor distances to set the _eps_ value.  The option `-t` generates such a plot for a given parameter set and read input.

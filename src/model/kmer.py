@@ -82,6 +82,8 @@ def loadKmers(inBAM,qual,k,nproc=0,
     sequences =  pd.DataFrame([{'qname':rec.query_name,'seq':rec.query_sequence}
                                for rec in recGen
                                if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)])    
+    if len(sequences) == 0:
+        raise Kmer_Exception('No sequences returned for clustering!')
 
     counts    = defaultdict(lambda: np.zeros(len(sequences),dtype=np.int16))
     parser    = seqParser(k,collapseHP=collapse,

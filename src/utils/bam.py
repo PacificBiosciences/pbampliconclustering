@@ -49,3 +49,30 @@ def addHPtag(inBAM,outBAM,clusterMap,region=None,splitBam=False,noCluster=NOCLUS
         pysam.index(n)
 
     return None
+
+def fqRec(name,seq,qual):
+    return f'@{name}\n{seq}\n+\n{qual}\n'
+
+def exportFastq(inBAM,outPrefix,clusterMap,region=None):
+    cvals  = set(clusterMap.values())
+    ofiles ={c : open(f'{outPrefix}.cluster{c}.fastq','w') 
+             for c in cvals if c!=-1} 
+    with pysam.AlignmentFile(inBAM) as inbam:
+        recGen = inbam.fetch(*getCoordinates(region)) if region else inbam
+        for rec in recGen:
+            if rec.flag & 0x900:
+                continue
+            if rec.query_name in clusterMap:
+                cluster = clusterMap[rec.query_name]
+                if cluster == -1: #noise
+                    continue
+                #TODO?? export in native orientation (revcomp if neg strand)
+                qual = ''.join([chr(q+33) for q in rec.query_qualities])
+                ofiles[cluster].write(fqRec(rec.query_name,
+                                            rec.query_sequence,
+                                            qual))
+    for c,f in ofiles.items():
+        f.close()
+
+    return None
+

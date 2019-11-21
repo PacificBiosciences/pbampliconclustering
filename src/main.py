@@ -1,6 +1,6 @@
 from src.model.kmer   import *
 from src.model.models import MODELS
-from src.utils.bam import addHPtag
+from src.utils.bam import addHPtag,exportFastq
 from src.utils.clust import clusterName
 from src.utils.extract import Extract_Exception
 
@@ -61,6 +61,11 @@ def main(args):
         clusterMap = dict(zip(names,clusterIdx))
         outBam     = f'{args.prefix}.hptagged.bam'
         addHPtag(args.inBAM,outBam,clusterMap,region=args.region,dropNoClust=args.drop,splitBam=args.splitBam)
+
+    #export fastq
+    if args.fastq:
+        print("Exporting fastq")
+        exportFastq(args.inBAM,args.prefix,clusterMap,region=args.region)
 
     #plot samples
     if args.plotReads:

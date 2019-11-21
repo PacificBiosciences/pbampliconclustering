@@ -80,6 +80,8 @@ out.add_argument('-S,--splitBam', dest='splitBam', action='store_true',
                 help='split clusters into separate bams (noise and no-cluster dropped). Default one bam')
 out.add_argument('-x,--noBam', dest='noBam', action='store_true',
                 help='Do not export HP-tagged bam of clustered reads')
+out.add_argument('-F,--fastq', dest='fastq', action='store_true',
+                help='Export one fastq per cluster')
 out.add_argument('-d,--drop', dest='drop', action='store_true',
                 help='Drop reads with no cluster in output bam.  Default keep all reads.')
 out.add_argument('-t,--testPlot', dest='testPlot', action='store_true',

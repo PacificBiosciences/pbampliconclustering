@@ -47,7 +47,7 @@ The two alleles are easily separated, and noisy reads are removed.
 One of the alleles, showing filtered reads in white (removed before clustering) and noise reads in gray (passed filter but not part of a cluster).  Filtered and Noise reads are automatically removed when the option `--splitBam` is used or if the `--drop` flag is present.
 ![HLA-A IGV](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/A_02-06-01.cluster.png) 
 
-## Quick Consensus
+## Quick Consensus with [bcftools](http://samtools.github.io/bcftools/bcftools.html)
 We can generate a quick consensus for cluster `1` using the first clustered read as a 'reference':
 
     $ samtools fasta clusterA.split.hptagged.1.bam | awk '/^>/ {n++} n>1 {exit} {print}' > clust1_1.fasta && samtools faidx clust1_1.fasta
@@ -80,6 +80,7 @@ For a second example, we can easily cluster all the DRB alleles in a single pass
                               -m 5 \
                               -w DRB.whitelist \
                               -p clusterDRB.split \
+                              -F \
                               mapped.lbc90--lbc90.consensusalignmentset.bam
     Reading Sequence
     Trimming low-freq kmers
@@ -94,24 +95,23 @@ For a second example, we can easily cluster all the DRB alleles in a single pass
     Writing 4 clusters with nreads 233,158,76,21
     28 reads identified as noise
     Adding HP tag to bam
+    Exporting fastq
 
 ![DRB split](https://github.com/PacificBiosciences/pbampliconclustering/blob/master/examples/hla/clusterDRB.clusters.png)
 
+## Quick Consensus with [c3s](https://github.com/armintoepfer/c3s)
+We can also make consensus calls using `c3s` which uses a POA weighted by the QV scores to generate a _denovo_ consensus.
 
-    $ samtools fasta clusterDRB.split.hptagged.3.bam | awk '/^>/ {n++} n>1 {exit} {print}' > clust3_1.fasta && samtools faidx clust3_1.fasta
+    $ parallel 'c3s --name Barcode0_ClusterDRB_Phase{}_NumReads$(grep -c ^@ clusterDRB.split.cluster{}.fastq) clusterDRB.split.cluster{}.fastq DRB.cluster{}.consensus.fasta' ::: 0 1 2 3
 
-    $ pbmm2 align --sort --preset CCS clust3_1.fasta clusterDRB.split.hptagged.3.bam \
-        | bcftools mpileup -Q 0 -B -Ou -f clust3_1.fasta - \
-        | bcftools call --ploidy 1 -mv -Ob \
-        | bcftools view -i 'QUAL>30' -Ob > clust3_polish.bcf && bcftools index clust3_polish.bcf
-    
-    $ bcftools consensus -f clust3_1.fasta clust3_polish.bcf > clust3_cons.fasta
+In this case, the IMGT database does not contain the full-length genomic DNA for these alleles, but we can match perfect exons for all expected alleles:
 
-In this case, the IMGT database does not contain the full-length genomic DNA for this allele, but we can match perfect exons for the expected allele:
-
-    $ minimap2 -x splice --cs 2>/dev/null clust3_cons.fasta cDNA_DRB1-04-06-01.fasta                                                               
-    HLA-DRB1\*04:06:01       801     100     678     -       m54043\_190914\_194303/37618640/ccs       4996    15      4751    578     578     60      NM:i:0 ms:i:578 AS:i:514        nn:i:0  ts:A:+  tp:A:P  cm:i:171        s1:i:556        s2:i:0  de:f:0  cs:Z::26~ct697ac:282~ct3461ac:270
-
+    $ cat DRB.typing                                                      
+    Sequence                               gLen  gType                gPctId nMis Indel cLen cType             cPctId Type
+    Barcode0_ClusterDRB_Phase3_NumReads21  4982  HLA-DRB1*04:03:01    99.88  2    4     552  HLA-DRB1*04:06:01 100.0  HLA-DRB1*04:06:01
+    Barcode0_ClusterDRB_Phase1_NumReads159 3836  HLA-DRB1*12:01:01    99.61  3    12    578  HLA-DRB1*12:02:01 100.0  HLA-DRB1*12:02:01
+    Barcode0_ClusterDRB_Phase0_NumReads233 3833  HLA-DRB3*01:01:02:01 97.79  66   19    577  HLA-DRB3*03:01:03 100.0  HLA-DRB3*03:01:03
+    Barcode0_ClusterDRB_Phase2_NumReads76  4313  HLA-DRB4*01:03:01:01 99.93  0    3     578  HLA-DRB4*01:03:01 100.0  HLA-DRB4*01:03:01
 
 
 
