@@ -4,12 +4,14 @@ from multiprocessing import Pool,Manager,cpu_count
 import pandas as pd
 import numpy as np
 import mappy as mp
-import skbio.diversity.alpha as ad
+#import skbio.diversity.alpha as ad
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
 from ..utils.extract import getCoordinates, \
                             extractRegion
+
+FLANKSIZE=500
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
@@ -41,9 +43,9 @@ def getMinimizer(m=6):
         return sorted(seq[i:i+m] for i in range(0,len(seq)-m))[0]
     return minimizer
 
-def simpsonFilter(data,maxDom):
-    dom = data.apply(lambda feat: ad.dominance(np.bincount(feat)))
-    return data.loc[:,dom<=maxDom]
+#def simpsonFilter(data,maxDom):
+#    dom = data.apply(lambda feat: ad.dominance(np.bincount(feat)))
+#    return data.loc[:,dom<=maxDom]
 
 def noFilter(x):
     return True
@@ -64,7 +66,7 @@ def loadKmers(inBAM,qual,k,nproc=0,
     bam         = pysam.AlignmentFile(inBAM,'rb')
     if region:
         if extractRef:
-            recGen = extractRegion(inBAM,extractRef,region)
+            recGen = extractRegion(inBAM,extractRef,region,flanksize=FLANKSIZE)
         else:
             recGen = bam.fetch(*getCoordinates(region))
     else:
