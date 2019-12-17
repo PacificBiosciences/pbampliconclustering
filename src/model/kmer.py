@@ -4,7 +4,6 @@ from multiprocessing import Pool,Manager,cpu_count
 import pandas as pd
 import numpy as np
 import mappy as mp
-#import skbio.diversity.alpha as ad
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
@@ -12,23 +11,15 @@ from ..utils.extract import getCoordinates, \
                             extractRegion
 
 FLANKSIZE=500
+MAXPALOVR=250 #max rev comp overlap bwtn primary/supp alignments
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
     return _PATT.sub(r'\1',seq)
 
-def countKmers(k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
-    transform =  hpCollapse if collapseHP else ident
-    minim     =  getMinimizer(minimizer) if minimizer>0 else ident
-    end       =  -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
-    def getKmers(seq):
-        s = transform(seq[ignoreEnds:end])
-        return Counter(minim(s[i:i+k]) for i in range(len(s)-k))
-    return getKmers
-
 def qualityCrit(minqv):
     def crit(rec):
-        return rec.get_tag('rq') >= minqv and not (rec.flag & 0x900)
+        return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
     return crit
 
 def getFlankCrit(flankFa):
@@ -40,12 +31,8 @@ def getFlankCrit(flankFa):
 
 def getMinimizer(m=6):
     def minimizer(seq):
-        return sorted(seq[i:i+m] for i in range(0,len(seq)-m))[0]
+        return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
     return minimizer
-
-#def simpsonFilter(data,maxDom):
-#    dom = data.apply(lambda feat: ad.dominance(np.bincount(feat)))
-#    return data.loc[:,dom<=maxDom]
 
 def noFilter(x):
     return True
@@ -53,13 +40,24 @@ def noFilter(x):
 def ident(x):
     return x
 
+def overlap(a,b):
+    return min(a.r_en,b.r_en) - max(a.r_st,b.r_st)
+
+def isArtifact(alns,maxOvr=MAXPALOVR):
+    for i,aln1 in alns.iterrows():
+        for j,aln2 in alns.loc[i:].iterrows():
+            if i==j: continue
+            if overlap(aln1,aln2) > maxOvr and aln1.isrev!=aln2.isrev:
+                return True
+    return False
+
 def loadKmers(inBAM,qual,k,nproc=0,
               collapse=True,region=None,
               minimizer=0,ignoreEnds=0,
               whitelist=None,flanks=None,
               trim=0,norm=None,
               components=3,agg='pca',
-              extractRef=None):
+              extractRef=None,palfilter=True):
     '''
     kmer loader
     '''
@@ -81,9 +79,29 @@ def loadKmers(inBAM,qual,k,nproc=0,
     flankCrit   = getFlankCrit(flanks) if flanks else noFilter
 
     print("Reading Sequence")
-    sequences =  pd.DataFrame([{'qname':rec.query_name,'seq':rec.query_sequence}
-                               for rec in recGen
-                               if useRead(rec.query_name) and passQuality(rec) and flankCrit(rec)])    
+    seqDB = pd.DataFrame([{'qname'   :rec.query_name,
+                           'seq'     :rec.query_sequence,
+                           'r_st'    :rec.reference_start,
+                           'r_en'    :rec.reference_end,
+                           'isSecond':bool(rec.flag & 0x900),
+                           'isrev'   :bool(rec.flag & 0x10)}
+                          for rec in recGen
+                          if useRead(rec.query_name) 
+                            and passQuality(rec) 
+                            and flankCrit(rec)])    
+
+    if palfilter:
+        #filter out palindromic sequences
+        multiMapped = seqDB[seqDB.isSecond].qname
+        palindromes = seqDB.query('qname in @multiMapped')\
+                           .groupby('qname')\
+                           .filter(isArtifact)\
+                           .qname.unique()
+        sequences = seqDB.query('qname not in @palindromes and not isSecond')
+    else:
+        #just remove secondary/supplemental alignments
+        sequences = seqDB.query('not isSecond')
+
     if len(sequences) == 0:
         raise Kmer_Exception('No sequences returned for clustering!')
 
@@ -97,9 +115,6 @@ def loadKmers(inBAM,qual,k,nproc=0,
 
     data = pd.DataFrame(np.array(list(counts.values())).T,
                         index=sequences.qname)
-#    if simpson>0:
-#        print('Filtering by dominance')
-#        data = simpsonFilter(data,simpson)
 
     if trim:
         print("Trimming low-freq kmers")
@@ -133,45 +148,8 @@ class seqParser:
         self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
     def __call__(self, seq):
         s = self.transform(seq[self.start:self.end])
-        for i in range(len(s)-self.k):
+        for i in range(len(s)-self.k+1):
             yield self.minim(s[i:i+self.k])
-
-#class kmerCounter:
-#    def __init__(self,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
-#        self.k         = k
-#        self.transform = hpCollapse if collapseHP else ident
-#        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
-#        self.start     = ignoreEnds
-#        self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
-#    def __call__(self, seq):
-#        s = self.transform(seq[self.start:self.end])
-#        return Counter(self.minim(s[i:i+self.k]) for i in range(len(s)-self.k))
-
-class kmerCounter2:
-    def __init__(self,size,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
-        self.size      = size
-        self.k         = k
-        self.transform = hpCollapse if collapseHP else ident
-        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
-        self.start     = ignoreEnds
-        self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
-    def __call__(self, i, seq, multiDict):
-        s = self.transform(seq[self.start:self.end])
-        for j in range(len(s)-self.k):
-            kmer = self.minim(s[j:j+self.k])
-            if kmer not in multiDict:
-                multiDict[kmer] = np.zeros(self.size,int)
-            arr = multiDict[kmer]
-            arr[i] +=1
-            multiDict[kmer] = arr
-            print(f'adding {i}:{arr[:i+1]}  :  {kmer} {multiDict[kmer][:i+1]}')
-
-class recordMaker:
-    def __init__(self, counter):
-        self.counter = counter
-    def __call__(self, rec):
-        return pd.Series(self.counter(rec[1]),
-                         name=rec[0])
 
 class Kmer_Exception(Exception):
     pass

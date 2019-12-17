@@ -11,7 +11,7 @@ def countMotifs(motifs,lengthField=None):
         returns a function that takes a sequence and returns a dict of counts
         optionally includes length of seq in output
     '''
-    patt = re.compile('(' + ')|('.join(motifs) + ')')
+    patt = re.compile('|'.join(f'({m})' for m in motifs))
     def getCounts(seq):
         counts = Counter(m.group() for m in patt.finditer(seq))
         if lengthField:

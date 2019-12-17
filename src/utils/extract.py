@@ -6,11 +6,13 @@ from tempfile import NamedTemporaryFile
 ALIGNFILTER=0x900
 
 class SimpleRecord:
-    def __init__(self,name,seq,qual,flag):
-        self.query_name     = name
-        self.query_sequence = seq
-        self.rq             = self._getQual(qual)
-        self.flag           = flag
+    def __init__(self,name,seq,start,end,qual,flag):
+        self.query_name      = name
+        self.query_sequence  = seq
+        self.reference_start = start
+        self.reference_end   = end
+        self.rq              = self._getQual(qual)
+        self.flag            = flag
     def _getQual(self,phred):
         return mean([1-10**(-q/10) for q in phred])
     def get_tag(self,tag):
@@ -39,9 +41,11 @@ def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flan
                 continue
             rStart,rStop,subseq = extractRepeat(rec.query_sequence,aligner)
             if rStart and rStop:
-                name = f'{rec.query_name}/{rStart}_{rStop}'
-                qual = rec.query_qualities[rStart:rStop]
-                yield SimpleRecord(name,subseq,qual,rec.flag)
+                name  = f'{rec.query_name}/{rStart}_{rStop}'
+                qual  = rec.query_qualities[rStart:rStop]
+                start = rec.reference_start + rStart
+                end   = rec.reference_end + rStop
+                yield SimpleRecord(name,subseq,start,end,qual,rec.flag)
     finally:
         os.remove(tmp.name)
 

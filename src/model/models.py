@@ -80,7 +80,7 @@ class Optics(ClusterModel):
                 'njobs'      : 'n_jobs',
                 'normalize'  : 'metric'}
 
-class Kmeans(ClusterModel):
+class Kmeans(ClusterModel_wNoise):
     MODEL    = KMeans
     defaults = {'n_clusters'  : 2,
                 'max_iter'    : 300,

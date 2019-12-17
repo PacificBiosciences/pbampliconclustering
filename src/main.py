@@ -22,7 +22,8 @@ def main(args):
                      norm       =args.normalize,
                      components =args.components,
                      agg        =args.agg,
-                     extractRef =args.reference)
+                     extractRef =args.reference,
+                     palfilter  =args.palfilter)
 
     #Plot k-nearest neighbors
     if args.testPlot:
@@ -54,11 +55,12 @@ def main(args):
             namefile.write(f'>{name}\n')
             namefile.write('\n'.join(reads.index) + '\n')
 
+    names      = data.index.map(stripReadname)
+    clusterMap = dict(zip(names,clusterIdx))
+
     #tag BAM
     if not args.noBam:
         print("Adding HP tag to bam")
-        names      = data.index.map(stripReadname)
-        clusterMap = dict(zip(names,clusterIdx))
         outBam     = f'{args.prefix}.hptagged.bam'
         addHPtag(args.inBAM,outBam,clusterMap,region=args.region,dropNoClust=args.drop,splitBam=args.splitBam)
 
