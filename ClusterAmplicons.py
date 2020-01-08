@@ -67,14 +67,20 @@ filt.add_argument('--extractReference', dest='reference', type=str, default=None
                 help='Extract subsequence at region coordinates for clustering using fasta reference (must have .fai). Maps 100nt on either side of region to each read and extracts sequence inbetween for kmer counting. \nDefault None (use full read)')
 filt.add_argument('-q','--minQV', dest='minQV', type=float, default=0.99,
                 help='Minimum quality [0-1] to use for clustering. Default 0.99')
-#filt.add_argument('-s,--simpsonDominance', dest='simpson', type=float, default=DEFAULTSIMP,
-#                help=f'Dominance filter for kmers.  Remove kmers with > s (dominance). Default {DEFAULTSIMP:.2f} (no filter)')
+filt.add_argument('-l','--minLength', dest='minLength', type=int, default=500,
+                help='Minimum length read to use for clustering. Default 500')
+filt.add_argument('-L','--maxLength', dest='maxLength', type=int, default=25000,
+                help='Maximum length read to use for clustering. Default 25000')
 filt.add_argument('-w','--whitelist', dest='whitelist', type=str, default=None,
                 help='whitelist of read names to cluster. Default None')
+filt.add_argument('-N','--nReads', dest='nReads', type=int, default=0,
+                help='Randomly downsample to nReads after filtering. Default 0 (all avail reads)')
 filt.add_argument('-f','--flanks', dest='flanks', type=str, default=None,
                 help='fasta of flanking/primer sequence. Reads not mapping to both will be filtered. Default None')
 filt.add_argument('-A','--noArtifactFilter', dest='palfilter',  action='store_false', default=True,
-                help='Turn of palindromic-artifact filtering. Default use artifact filter')
+                help='Turn off palindromic-artifact filtering. Default use artifact filter')
+filt.add_argument('-s','--seed', dest='seed',type=int, default=17,
+                help='Random seed for downsampling. Default 17')
 out = parser_main.add_argument_group('output')
 out.add_argument('-p','--prefix', dest='prefix', type=str, default=DEFAULTPREFIX,
                 help=f'Output prefix. Default {DEFAULTPREFIX}')
@@ -88,14 +94,19 @@ out.add_argument('-d','--drop', dest='drop', action='store_true',
                 help='Drop reads with no cluster in output bam.  Default keep all reads.')
 out.add_argument('-t','--testPlot', dest='testPlot', action='store_true',
                 help='Plot reads vs dist to nearest m-neighbors without clustering')
-out.add_argument('-g','--plotReads', dest='plotReads', action='store_true',
-                help='Plot first 2 axes of PCA for each read.  Default no plot generated')
+out.add_argument('-g','--plotReads', dest='plotReads', type=int, default=None,
+                help='Write pairplot of first g reduced axes for each read.  Default None (no plot)')
+out.add_argument('-X','--exportKmerTable', dest='exportKmerTable', action='store_true',default=False,
+                help='Export kmer count table after trimming. Default False')
 
 try:
     args = parser.parse_args()
     if hasattr(args,'inBAM'):
         if args.inBAM=='-' and not args.noBam:
             raise Clustering_Exception('Retagging streamed bam is not supported.  Please use -x option')
+    if hasattr(args,'plotReads'):
+        if args.plotReads == 1:
+            raise Clustering_Exception('PlotReads argument cannot be 1.  Must be 0 (no plot) or >=2')
     args.func(args)
 except (Clustering_Exception,Kmer_Exception,Extract_Exception) as e:
     print(f'ERROR: {e}')

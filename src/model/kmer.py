@@ -11,7 +11,10 @@ from ..utils.extract import getCoordinates, \
                             extractRegion
 
 FLANKSIZE=500
+MINLEN   =500
+MAXLEN   =25000
 MAXPALOVR=250 #max rev comp overlap bwtn primary/supp alignments
+RANDSEED =17
 
 _PATT = re.compile(r'([ATGC])\1+')
 def hpCollapse(seq):
@@ -20,6 +23,12 @@ def hpCollapse(seq):
 def qualityCrit(minqv):
     def crit(rec):
         return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
+    return crit
+
+def getLengthCrit(minLen,maxLen):
+    def crit(rec):
+        rlen = rec.query_length
+        return rlen >= minLen and rlen <= maxLen
     return crit
 
 def getFlankCrit(flankFa):
@@ -53,11 +62,14 @@ def isArtifact(alns,maxOvr=MAXPALOVR):
 
 def loadKmers(inBAM,qual,k,nproc=0,
               collapse=True,region=None,
+              minLength=MINLEN,maxLength=MAXLEN,
               minimizer=0,ignoreEnds=0,
               whitelist=None,flanks=None,
               trim=0,norm=None,
               components=3,agg='pca',
-              extractRef=None,palfilter=True):
+              extractRef=None,palfilter=True,
+              exportKmers=None,subsample=0,
+              randseed=RANDSEED):
     '''
     kmer loader
     '''
@@ -76,6 +88,7 @@ def loadKmers(inBAM,qual,k,nproc=0,
     else:
         useRead = noFilter
     passQuality = qualityCrit(qual)
+    lengthCrit  = getLengthCrit(minLength,maxLength)
     flankCrit   = getFlankCrit(flanks) if flanks else noFilter
 
     print("Reading Sequence")
@@ -87,7 +100,8 @@ def loadKmers(inBAM,qual,k,nproc=0,
                            'isrev'   :bool(rec.flag & 0x10)}
                           for rec in recGen
                           if useRead(rec.query_name) 
-                            and passQuality(rec) 
+                            and passQuality(rec)
+                            and lengthCrit(rec) 
                             and flankCrit(rec)])    
 
     if palfilter:
@@ -105,6 +119,10 @@ def loadKmers(inBAM,qual,k,nproc=0,
     if len(sequences) == 0:
         raise Kmer_Exception('No sequences returned for clustering!')
 
+    if subsample and len(sequences) > subsample:
+        print(f"Downsampling to {subsample} reads from {len(sequences)}")
+        sequences = sequences.sample(subsample,replace=False,random_state=randseed)
+
     counts    = defaultdict(lambda: np.zeros(len(sequences),dtype=np.int16))
     parser    = seqParser(k,collapseHP=collapse,
                           minimizer=minimizer,
@@ -117,9 +135,15 @@ def loadKmers(inBAM,qual,k,nproc=0,
                         index=sequences.qname)
 
     if trim:
-        print("Trimming low-freq kmers")
+        #print("Trimming low-freq kmers")
+        print("Trimming high- and low-freq kmers")
         freqs = data.sum()/len(data)
-        data  = data.loc[:,freqs>=trim] 
+        #data  = data.loc[:,freqs>=trim] 
+        data  = data.loc[:,(freqs>=trim) & (freqs<=(1-trim))] 
+
+    if exportKmers:
+        print('Exporting kmer counts')
+        data.rename(columns=dict(enumerate(counts.keys()))).to_csv(exportKmers)
 
     if norm:
         print('Normalizing data')

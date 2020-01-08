@@ -59,23 +59,17 @@ The full set of options for any clustering algorithm can be accessed using a `.j
 Options and examples discussed below.
 
     $ py3 ClusterAmplicons.py cluster -h
-    usage: ClusterAmplicons.py cluster [-h] [-j,--njobs NJOBS] [-k,--kmer KMER]
-                                       [-z,--minimizer MINIMIZER]
-                                       [-H,--noHPcollapse] [-T TRIM]
-                                       [-M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}]
-                                       [-a,--agg {pca,featagg}]
-                                       [-c,--components COMPONENTS] [-e,--eps EPS]
-                                       [-m,--minReads MINREADS]
-                                       [-n,--normalize {l1,l2,none}]
-                                       [-i,--ignoreEnds IGNOREENDS]
-                                       [-P,--params PARAMS] [-r,--region REGION]
-                                       [--extractReference REFERENCE]
-                                       [-q,--minQV MINQV]
-                                       [-w,--whitelist WHITELIST]
-                                       [-f,--flanks FLANKS] [-p,--prefix PREFIX]
-                                       [-S,--splitBam] [-x,--noBam] [-F,--fastq]
-                                       [-d,--drop] [-t,--testPlot]
-                                       [-g,--plotReads]
+    usage: ClusterAmplicons.py cluster [-h] [-j,--njobs NJOBS] [-k KMER]
+                                       [-z MINIMIZER] [-H] [-T TRIM]
+                                       [-M {dbscan,optics,aggcluster,affprop,meanshift,kmeans}]
+                                       [-a {pca,featagg}] [-c COMPONENTS] [-e EPS]
+                                       [-m MINREADS] [-n {l1,l2,none}]
+                                       [-i IGNOREENDS] [-P PARAMS] [-r REGION]
+                                       [--extractReference REFERENCE] [-q MINQV]
+                                       [-l MINLENGTH] [-L MAXLENGTH]
+                                       [-w WHITELIST] [-N NREADS] [-f FLANKS] [-A]
+                                       [-s SEED] [-p PREFIX] [-S] [-x] [-F] [-d]
+                                       [-t] [-g PLOTREADS] [-X]
                                        [inBAM]
     
     positional arguments:
@@ -86,36 +80,38 @@ Options and examples discussed below.
       -j,--njobs NJOBS      j parallel jobs (only for some models). Default 1
     
     kmers:
-      -k,--kmer KMER        kmer size for clustering. Default 11
-      -z,--minimizer MINIMIZER
+      -k KMER, --kmer KMER  kmer size for clustering. Default 11
+      -z MINIMIZER, --minimizer MINIMIZER
                             group kmers by minimizer of length z. Default 0 (no
                             minimizer)
-      -H,--noHPcollapse     do not compress homopolymers. Default collapse HP
+      -H, --noHPcollapse    do not compress homopolymers. Default collapse HP
       -T TRIM, --trim TRIM  Trim kmers with frequency < trim. Default 0.10
     
     cluster:
-      -M,--model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}
+      -M {dbscan,optics,aggcluster,affprop,meanshift,kmeans}, --model {dbscan,optics,aggcluster,affprop,meanshift,kmeans}
                             clustering model. See https://scikit-
                             learn.org/stable/modules/clustering.html. Default
                             dbscan
-      -a,--agg {pca,featagg}
+      -a {pca,featagg}, --agg {pca,featagg}
                             Feature reduction method. Default pca
-      -c,--components COMPONENTS
+      -c COMPONENTS, --components COMPONENTS
                             Use first c components of PCA/FeatAgg for clustering.
                             Set to 0 for no reduction. Default 2
-      -e,--eps EPS          eps cluster tolerance. Default None
-      -m,--minReads MINREADS
+      -e EPS, --eps EPS     eps cluster tolerance. Default None
+      -m MINREADS, --minReads MINREADS
                             Minimum reads to be a cluster. Default 5
-      -n,--normalize {l1,l2,none}
+      -n {l1,l2,none}, --normalize {l1,l2,none}
                             normalization of kmer counts. Default l2
-      -i,--ignoreEnds IGNOREENDS
+      -i IGNOREENDS, --ignoreEnds IGNOREENDS
                             ignore i bases at ends of amplicons for clustering.
                             Default 0
-      -P,--params PARAMS    json file of parameters for specific model. Order of
+      -P PARAMS, --params PARAMS
+                            json file of parameters for specific model. Order of
                             precedence: json > CL-opts > defaults. Default None
     
     filter:
-      -r,--region REGION    Target region for selection of reads, format
+      -r REGION, --region REGION
+                            Target region for selection of reads, format
                             '[chr]:[start]-[stop]'. Example '4:3076604-3076660'.
                             Default all reads (no region)
       --extractReference REFERENCE
@@ -124,25 +120,43 @@ Options and examples discussed below.
                             Maps 100nt on either side of region to each read and
                             extracts sequence inbetween for kmer counting. Default
                             None (use full read)
-      -q,--minQV MINQV      Minimum quality [0-1] to use for clustering. Default
+      -q MINQV, --minQV MINQV
+                            Minimum quality [0-1] to use for clustering. Default
                             0.99
-      -w,--whitelist WHITELIST
+      -l MINLENGTH, --minLength MINLENGTH
+                            Minimum length read to use for clustering. Default 500
+      -L MAXLENGTH, --maxLength MAXLENGTH
+                            Maximum length read to use for clustering. Default
+                            25000
+      -w WHITELIST, --whitelist WHITELIST
                             whitelist of read names to cluster. Default None
-      -f,--flanks FLANKS    fasta of flanking/primer sequence. Reads not mapping
+      -N NREADS, --nReads NREADS
+                            Randomly downsample to nReads after filtering. Default
+                            0 (all avail reads)
+      -f FLANKS, --flanks FLANKS
+                            fasta of flanking/primer sequence. Reads not mapping
                             to both will be filtered. Default None
+      -A, --noArtifactFilter
+                            Turn off palindromic-artifact filtering. Default use
+                            artifact filter
+      -s SEED, --seed SEED  Random seed for downsampling. Default 17
     
     output:
-      -p,--prefix PREFIX    Output prefix. Default ./clustered
-      -S,--splitBam         split clusters into separate bams (noise and no-
+      -p PREFIX, --prefix PREFIX
+                            Output prefix. Default ./clustered
+      -S, --splitBam        split clusters into separate bams (noise and no-
                             cluster dropped). Default one bam
-      -x,--noBam            Do not export HP-tagged bam of clustered reads
-      -F,--fastq            Export one fastq per cluster
-      -d,--drop             Drop reads with no cluster in output bam. Default keep
+      -x, --noBam           Do not export HP-tagged bam of clustered reads
+      -F, --fastq           Export one fastq per cluster
+      -d, --drop            Drop reads with no cluster in output bam. Default keep
                             all reads.
-      -t,--testPlot         Plot reads vs dist to nearest m-neighbors without
+      -t, --testPlot        Plot reads vs dist to nearest m-neighbors without
                             clustering
-      -g,--plotReads        Plot first 2 axes of PCA for each read. Default no
-                            plot generated
+      -g PLOTREADS, --plotReads PLOTREADS
+                            Write pairplot of first g reduced axes for each read.
+                            Default None (no plot)
+      -X, --exportKmerTable
+                            Export kmer count table after trimming. Default False
 
 ## Region Selection
 Clustering can occur for all reads, a subset of reads, or over a defined reference window spanned by a subset of reads.  By default, all sequence in the input bam will be characterized by kmer counts and clustered.  
@@ -156,6 +170,8 @@ Reads are filtered by minimum read quality `-q` [0-1], default `0.99`.  For extr
 
 Primer sequences can be supplied to filter artifacts.  Reads will only be included in clustering analysis if both primers occur in the read.
 
+Potential sequencing artifacts with missing adapters are automatically removed.  To turn off this filter, use the `-A` flag.
+
 ## Clustering
 Clustering is based on kmer count vectors for each read in the input dataset, following region selection and filtering.  
 
@@ -164,7 +180,7 @@ By default homopolymer stretches (n>=2) are compressed prior to kmer counting.  
 
 Kmers can be grouped by a _minimizer_ of size `-z`.  This is a naive implementation that labels all kmers by the first lexicographically sorted substring of length _z_.  
 
-Kmers of frequency less than `-T` in the dataset will be removed prior to clustering.
+Kmers of frequency less than `T` or greater than `1 - T` in the dataset will be removed prior to clustering.
 
 ### Feature Reduction
 [PCA](https://scikit-learn.org/stable/modules/decomposition.html#principal-component-analysis-pca) or [feature agglomeration](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.FeatureAgglomeration.html#sklearn.cluster.FeatureAgglomeration) can be used to reduce the number of clustering features.  The option `-a,--agg` sets the method, and `-c` determines the number of used components (PCA) or output features (featagg).  Setting the number of components to 0 turns off feature reduction.

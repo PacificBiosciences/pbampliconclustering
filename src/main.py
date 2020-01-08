@@ -9,21 +9,26 @@ def main(args):
         args.normalize = None
 
     #load dataframe with samples(row) by kmer counts (cols)
+    kmertable =  f'{args.prefix}.kmercounts.csv' if args.exportKmerTable else None
     data = loadKmers(args.inBAM,args.minQV,args.kmer,
                      nproc      =args.njobs,
                      collapse   =args.hpCollapse,
                      region     =args.region,
+                     minLength  =args.minLength,
+                     maxLength  =args.maxLength,
                      minimizer  =args.minimizer,
                      ignoreEnds =args.ignoreEnds,
                      whitelist  =args.whitelist,
                      flanks     =args.flanks,
-                     #simpson    =args.simpson,
                      trim       =args.trim,
                      norm       =args.normalize,
                      components =args.components,
                      agg        =args.agg,
                      extractRef =args.reference,
-                     palfilter  =args.palfilter)
+                     palfilter  =args.palfilter,
+                     exportKmers=kmertable,
+                     subsample  =args.nReads,
+                     randseed   =args.seed)
 
     #Plot k-nearest neighbors
     if args.testPlot:
@@ -62,7 +67,8 @@ def main(args):
     if not args.noBam:
         print("Adding HP tag to bam")
         outBam     = f'{args.prefix}.hptagged.bam'
-        addHPtag(args.inBAM,outBam,clusterMap,region=args.region,dropNoClust=args.drop,splitBam=args.splitBam)
+        #addHPtag(args.inBAM,outBam,clusterMap,region=args.region,dropNoClust=args.drop,splitBam=args.splitBam)
+        addHPtag(args,outBam,clusterMap)
 
     #export fastq
     if args.fastq:
@@ -72,7 +78,7 @@ def main(args):
     #plot samples
     if args.plotReads:
         from src.figures.cluster import plotReads
-        fig = plotReads(data,clusterIdx)
+        fig = plotReads(data,clusterIdx,args.plotReads)
         fig.savefig(f'{args.prefix}.clusters.png')
 
     return data,cluster,result
