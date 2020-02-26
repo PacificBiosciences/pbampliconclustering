@@ -121,7 +121,7 @@ class VariantGrouper:
             clust1  = vCluster(refcall,
                                next(self.labeler),
                                parent=rootLbl,
-                               split=('all','-'),
+                               split=('all','refcall'),
                                pending=False)
             self.vTree.append(clust1)
         #reads with vars in selected pos
