@@ -8,21 +8,25 @@ from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import FeatureAgglomeration
 from ..utils.extract import getCoordinates, \
-                            extractRegion
+                            extractRegion, \
+                            fastqReader
 
-FLANKSIZE=500
-MINLEN   =500
+FLANKSIZE=100
+MINLEN   =50
 MAXLEN   =25000
 MAXPALOVR=250 #max rev comp overlap bwtn primary/supp alignments
 RANDSEED =17
 
-_PATT = re.compile(r'([ATGC])\1+')
-def hpCollapse(seq):
-    return _PATT.sub(r'\1',seq)
+#_PATT = re.compile(r'([ATGC])\1+')
+#def hpCollapse(seq):
+#    return _PATT.sub(r'\1',seq)
 
 def qualityCrit(minqv):
-    def crit(rec):
-        return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
+    if minqv == 0: #turn off
+        crit = noFilter
+    else:
+        def crit(rec):
+            return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
     return crit
 
 def getLengthCrit(minLen,maxLen):
@@ -38,10 +42,10 @@ def getFlankCrit(flankFa):
         return np.all([len(list(a.map(f)))==1 for f in flanks])
     return includesFlanks
 
-def getMinimizer(m=6):
-    def minimizer(seq):
-        return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
-    return minimizer
+#def getMinimizer(m=6):
+#    def minimizer(seq):
+#        return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
+#    return minimizer
 
 def noFilter(x):
     return True
@@ -60,12 +64,13 @@ def isArtifact(alns,maxOvr=MAXPALOVR):
                 return True
     return False
 
-def loadKmers(inBAM,qual,k,nproc=0,
-              collapse=True,region=None,
+def loadKmers(inFile,qual,k,
+              fileType='bam',
+              collapse=1,region=None,
               minLength=MINLEN,maxLength=MAXLEN,
               minimizer=0,ignoreEnds=0,
               whitelist=None,flanks=None,
-              trim=0,norm=None,
+              trim=None,norm=None,
               components=3,agg='pca',
               extractRef=None,palfilter=True,
               exportKmers=None,subsample=0,
@@ -73,15 +78,21 @@ def loadKmers(inBAM,qual,k,nproc=0,
     '''
     kmer loader
     '''
-    bam         = pysam.AlignmentFile(inBAM,'rb')
-    if region:
-        if extractRef:
-            recGen = extractRegion(inBAM,extractRef,region,flanksize=FLANKSIZE)
+    #Input generator
+    if fileType == 'bam':
+        bam         = pysam.AlignmentFile(inFile,'rb')
+        if region:
+            if extractRef:
+                recGen = extractRegion(inFile,extractRef,region,flanksize=FLANKSIZE)
+            else:
+                recGen = bam.fetch(*getCoordinates(region))
         else:
-            recGen = bam.fetch(*getCoordinates(region))
+            recGen = bam
+    elif fileType == 'fastq':
+        recGen = fastqReader(inFile) 
     else:
-        recGen = bam
-
+        raise Kmer_Exception('Invalid input type')
+    #Filters
     if whitelist:
         wl      = open(whitelist).read().split()
         useRead = (lambda read: read in wl)
@@ -134,12 +145,12 @@ def loadKmers(inBAM,qual,k,nproc=0,
     data = pd.DataFrame(np.array(list(counts.values())).T,
                         index=sequences.qname)
 
-    if trim:
+    if trim != [0,1]:
         #print("Trimming low-freq kmers")
-        print("Trimming high- and low-freq kmers")
-        freqs = data.sum()/len(data)
+        print(f"Trimming kmers top,bottom {trim}")
+        freqs = (data!=0).sum()/len(data)
         #data  = data.loc[:,freqs>=trim] 
-        data  = data.loc[:,(freqs>=trim) & (freqs<=(1-trim))] 
+        data  = data.loc[:,(freqs>=trim[0]) & (freqs<=trim[1])] 
 
     if exportKmers:
         print('Exporting kmer counts')
@@ -157,23 +168,45 @@ def loadKmers(inBAM,qual,k,nproc=0,
         elif agg == 'featagg':
             tool = FeatureAgglomeration(n_clusters=components)
         else:
-            raise Kmer_Error(f'{agg} is not a valid reduction tool')
-        data = pd.DataFrame(tool.fit_transform(data),
-                            index=data.index)
+            raise Kmer_Exception(f'{agg} is not a valid reduction tool')
+        try:
+            data = pd.DataFrame(tool.fit_transform(data),
+                                index=data.index)
+        except ValueError as e:
+            #catch errors in reduction
+            raise Kmer_Exception(f'Too few datapoints: {e}')
 
     return data
 
 class seqParser:
-    def __init__(self,k=11,collapseHP=True,minimizer=0,ignoreEnds=0):
+    def __init__(self,k=11,collapseHP=1,minimizer=0,ignoreEnds=0):
         self.k         = k
-        self.transform = hpCollapse if collapseHP else ident
-        self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
+        #self.transform = hpCollapse if collapseHP else ident
+        self.transform = self.hpCollapse(collapseHP) if collapseHP >= 1 else ident
+        #self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
+        self.minim     = self.getMinimizer(minimizer) if minimizer>0 else ident
         self.start     = ignoreEnds
         self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything
     def __call__(self, seq):
         s = self.transform(seq[self.start:self.end])
         for i in range(len(s)-self.k+1):
             yield self.minim(s[i:i+self.k])
+    def hpCollapse(self,maxLen=1):
+        def csgen(sequence):
+            last = None
+            for char in sequence:
+                if char == last:
+                    n += 1
+                else:
+                    last = char
+                    n    = 0
+                if n < maxLen:
+                    yield char
+        return lambda seq: ''.join(csgen(seq))
+    def getMinimizer(self,m=6):
+        def minimizer(seq):
+            return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
+        return minimizer
 
 class Kmer_Exception(Exception):
     pass

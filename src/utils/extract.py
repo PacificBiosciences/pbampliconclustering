@@ -5,21 +5,6 @@ from tempfile import NamedTemporaryFile
 
 ALIGNFILTER=0x900
 
-class SimpleRecord:
-    def __init__(self,name,seq,start,end,qual,flag):
-        self.query_name      = name
-        self.query_sequence  = seq
-        self.reference_start = start
-        self.reference_end   = end
-        self.rq              = self._getQual(qual)
-        self.flag            = flag
-    def _getQual(self,phred):
-        return mean([1-10**(-q/10) for q in phred])
-    def get_tag(self,tag):
-        if tag != 'rq':
-            raise Extract_Exception(f'tag {tag} not available')
-        return self.rq
-
 def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flanksize=100):
     ref = pysam.FastaFile(reference)
     bam = pysam.AlignmentFile(inBAM)
@@ -48,6 +33,10 @@ def extractRegion(inBAM,reference,region=None,ctg=None,start=None,stop=None,flan
                 yield SimpleRecord(name,subseq,start,end,qual,rec.flag)
     finally:
         os.remove(tmp.name)
+
+def fastqReader(fqfile):
+    for rec in pysam.FastxFile(fqfile):
+        yield SimpleRecordFq(rec.name,rec.sequence,-1,-1,rec.quality,0)
 
 def getCoordinates(regionString):
     ctg,start,stop = re.search('(.*):(\d+)-(\d+)',regionString).groups()
@@ -90,6 +79,29 @@ _RC_MAP = dict(zip('-ACGNTacgt','-TGCNAtgca'))
 def rc(seq):
     '''revcomp'''
     return "".join([_RC_MAP[c] for c in seq[::-1]])
+
+class SimpleRecord:
+    def __init__(self,name,seq,start,end,qual,flag):
+        self.query_name      = name
+        self.query_sequence  = seq
+        self.query_qualities = self._getQual(qual)
+        self.reference_start = start
+        self.reference_end   = end
+        self.query_length    = len(seq)
+        self.rq              = self._getRQ(self.query_qualities)
+        self.flag            = flag
+    def _getQual(self,qual):
+        return qual
+    def _getRQ(self,phred):
+        return mean([1-10**(-q/10) for q in phred])
+    def get_tag(self,tag):
+        if tag != 'rq':
+            raise Extract_Exception(f'tag {tag} not available')
+        return self.rq
+
+class SimpleRecordFq(SimpleRecord):
+    def _getQual(self,qual):
+        return super()._getQual([ord(q)-33 for q in qual])
 
 class Extract_Exception(Exception):
     pass

@@ -1,6 +1,6 @@
 from src.model.kmer   import *
 from src.model.models import MODELS
-from src.utils.bam import addHPtag,exportFastq
+from src.utils.bam import addHPtag,exportFastq,stripReadname
 from src.utils.clust import clusterName
 from src.utils.extract import Extract_Exception
 
@@ -10,8 +10,23 @@ def main(args):
 
     #load dataframe with samples(row) by kmer counts (cols)
     kmertable =  f'{args.prefix}.kmercounts.csv' if args.exportKmerTable else None
-    data = loadKmers(args.inBAM,args.minQV,args.kmer,
-                     nproc      =args.njobs,
+    if args.inBAM:
+        inFile = args.inBAM
+        ftype  = 'bam'
+    elif args.inFastq:
+        inFile = args.inFastq
+        ftype  = 'fastq'
+    else:
+        raise Kmer_Exception('Must have input! Either BAM or Fastq')
+
+    trim = [args.trim,1-args.trim] if args.trim else [0,1]
+    if args.trimLow:
+        trim[0] = args.trimLow
+    if args.trimHigh:
+        trim[1] = args.trimHigh    
+
+    data = loadKmers(inFile,args.minQV,args.kmer,
+                     fileType   =ftype,
                      collapse   =args.hpCollapse,
                      region     =args.region,
                      minLength  =args.minLength,
@@ -20,7 +35,7 @@ def main(args):
                      ignoreEnds =args.ignoreEnds,
                      whitelist  =args.whitelist,
                      flanks     =args.flanks,
-                     trim       =args.trim,
+                     trim       =trim,
                      norm       =args.normalize,
                      components =args.components,
                      agg        =args.agg,
@@ -73,7 +88,7 @@ def main(args):
     #export fastq
     if args.fastq:
         print("Exporting fastq")
-        exportFastq(args.inBAM,args.prefix,clusterMap,region=args.region)
+        exportFastq(inFile,ftype,args.prefix,clusterMap,region=args.region)
 
     #plot samples
     if args.plotReads:
@@ -82,10 +97,6 @@ def main(args):
         fig.savefig(f'{args.prefix}.clusters.png')
 
     return data,cluster,result
-
-def stripReadname(readname):
-    '''strip off all but <movie>/<zmw>/ccs'''
-    return '/'.join(readname.split('/')[:3])
 
 def printParams(model):
     return '\n'.join(['\t' + '='.join(map(str,v)) for v in model.defaults.items()])
