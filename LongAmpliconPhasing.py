@@ -38,9 +38,9 @@ def main(parser):
     #cluster file/readnames
     with open(f'{args.prefix}{s}clusters.txt','w') as ofile:
         for node,clust in readGrouper.node2cluster.items():
-            node = readGrouper.vTree[node]
-            ofile.write(f'>{node.clusterName()}\n')
-            ofile.write('\n'.join(node.reads) + '\n')
+            vclust = readGrouper.vTree[node]
+            ofile.write(f'>{vclust.clusterName()}\n')
+            ofile.write('\n'.join(vclust.reads) + '\n')
     #summary table
     name    = f'{args.prefix}{s}summary.csv'
     readGrouper.summary().to_csv(name)

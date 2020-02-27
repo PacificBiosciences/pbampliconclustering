@@ -144,6 +144,8 @@ class VariantGrouper:
     def _splitGroups(self,vTable=None):
         if vTable is None:
             vTable = self.sigVar
+        #func to det if big enough to split
+        canSplit = (lambda t: len(t) >= 2*self.minCount)
         while len(self.pending):
             label   = self.pending.pop()
             self.vTree[label].pending = False
@@ -154,21 +156,19 @@ class VariantGrouper:
                 #self.vTree[label].pending = False
             else:
                 #joined by variant
-                canSplit = len(subset) >= 2*self.minCount
                 newGroup = vCluster(subset,
                                     next(self.labeler),
                                     parent =label,
                                     split  =(pos,vnt),
-                                    pending=canSplit)
+                                    pending=canSplit(subset))
                 self.vTree.append(newGroup)
                 #leftovers
                 complement = testSet.difference(subset)
-                canSplit   = len(complement) >= 2*self.minCount
                 remainder  = vCluster(complement,
                                       next(self.labeler),
                                       parent =label,
                                       split  =(pos,'.'),
-                                      pending=canSplit)
+                                      pending=canSplit(complement))
                 self.vTree.append(remainder)
             self._updatePending()
         return
