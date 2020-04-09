@@ -152,9 +152,10 @@ def loadKmers(inFile,qual,k,
         #data  = data.loc[:,freqs>=trim] 
         data  = data.loc[:,(freqs>=trim[0]) & (freqs<=trim[1])] 
 
+    col2kmer = dict(enumerate(counts.keys()))
     if exportKmers:
         print('Exporting kmer counts')
-        data.rename(columns=dict(enumerate(counts.keys()))).to_csv(exportKmers)
+        data.rename(columns=col2kmer).to_csv(exportKmers)
 
     if norm:
         print('Normalizing data')
@@ -176,13 +177,26 @@ def loadKmers(inFile,qual,k,
             #catch errors in reduction
             raise Kmer_Exception(f'Too few datapoints: {e}')
 
-    return data
+    return data.rename(columns=col2kmer)
+
+def hpCollapse(maxLen=2):
+    def csgen(sequence):
+        last = None
+        for char in sequence:
+            if char == last:
+                n += 1
+            else:
+                last = char
+                n    = 0
+            if n < maxLen:
+                yield char
+    return lambda seq: ''.join(csgen(seq))
 
 class seqParser:
     def __init__(self,k=11,collapseHP=1,minimizer=0,ignoreEnds=0):
         self.k         = k
         #self.transform = hpCollapse if collapseHP else ident
-        self.transform = self.hpCollapse(collapseHP) if collapseHP >= 1 else ident
+        self.transform = hpCollapse(collapseHP) if collapseHP >= 1 else ident
         #self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
         self.minim     = self.getMinimizer(minimizer) if minimizer>0 else ident
         self.start     = ignoreEnds
@@ -191,18 +205,18 @@ class seqParser:
         s = self.transform(seq[self.start:self.end])
         for i in range(len(s)-self.k+1):
             yield self.minim(s[i:i+self.k])
-    def hpCollapse(self,maxLen=1):
-        def csgen(sequence):
-            last = None
-            for char in sequence:
-                if char == last:
-                    n += 1
-                else:
-                    last = char
-                    n    = 0
-                if n < maxLen:
-                    yield char
-        return lambda seq: ''.join(csgen(seq))
+    #def hpCollapse(self,maxLen=1):
+    #    def csgen(sequence):
+    #        last = None
+    #        for char in sequence:
+    #            if char == last:
+    #                n += 1
+    #            else:
+    #                last = char
+    #                n    = 0
+    #            if n < maxLen:
+    #                yield char
+    #    return lambda seq: ''.join(csgen(seq))
     def getMinimizer(self,m=6):
         def minimizer(seq):
             return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
