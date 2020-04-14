@@ -91,22 +91,31 @@ class Phaser:
             self._updatePending()
         return
 
+    def _isRefCall(self,lbl):
+        plrty = self.splitter.sigVar.loc[self.vTree[lbl].reads]\
+                             .apply(pd.Series.value_counts).fillna(0).idxmax()
+        return (plrty== '.').all()
+
     def _getClusters(self):
         '''map of node label -> cluster'''
         #check for refcall -- all '.' variants for alignment method.  passes through for dbg meth
         offset = 0
         self.node2cluster = {}
+        isRefcall = self._isRefCall if hasattr(self.splitter,'refFasta') else (lambda lbl: False)
         for lbl in self.vTree.leaves:
             leaf = self.vTree[lbl]
             if len(leaf) < self.splitter.minCount:
                 #dump in noise bin
                 self.vTree.noise.update(leaf.reads)
                 leaf.setNoise()
-            elif self.vTree.isRefcall(lbl):
+            elif isRefcall(lbl):
                 #set as first
                 leaf.setRefCall()
                 self.node2cluster[lbl] = offset
                 offset += 1
+        #check if refcall was found, else increase offset if not found but there is one
+        if offset == 0 and hasattr(self.splitter,'refFasta') and not self.splitter.refFasta is None:
+            offset += 1
         #clusters sorted by size, descending
         sortedLeaves = sorted(filter(lambda n: not (self.vTree[n]._isNoise or self.vTree[n]._isRefCall),
                                      self.vTree.leaves),

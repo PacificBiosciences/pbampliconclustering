@@ -87,7 +87,7 @@ class VariantGrouper:
             maxReads = len(reads) - 1
         else:
             maxReads = len(reads) - self.minCount
-        vTable = self.sigVar.reindex(reads)
+        vTable = self.sigVar.loc[reads]
         counts = vTable.apply(pd.Series.value_counts).fillna(0)
         for ch in '.*':
             if ch in counts.index:
@@ -125,6 +125,7 @@ class sparseDBG:
     def loadReads(self,inFile,region=None,minLength=50,maxLength=50000):
         recGen = RecordGenerator(inFile,minLength=minLength,maxLength=maxLength)
         self.name2idx  = {rec.name:i for i,rec in enumerate(recGen)}
+        self.readnames = list(self.name2idx.keys())
         self.nReads    = len(self.readnames)
         self.minCount  = max(ceil(self.minFrac*self.nReads),self.minReads)
         allNodes       = {}
@@ -140,10 +141,6 @@ class sparseDBG:
                                           kmer=kmer,
                                           minCount=self.minCount)
                 
-    @property
-    def readnames(self):
-        return list(self.name2idx.keys())
-    
     def split(self,readnames):
         rIdxs = [self.name2idx[name] for name in readnames] 
         try:

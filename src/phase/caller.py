@@ -92,7 +92,7 @@ class VariantCaller:
             midx = pd.MultiIndex(levels=[[],[]],codes=[[],[]],names=allCounts.columns.names)
             return pd.DataFrame(columns=['-1'], index=midx)
         else:
-            return allCounts.loc[useVars[useVars].index,usePos[usePos].index].T
+            return allCounts.reindex(index=useVars[useVars].index,columns=usePos[usePos].index).T
     
     @property
     def variantFractions(self):
@@ -125,6 +125,8 @@ class VariantCaller:
                 delsize = sum(1 for b in vnt if b in bases)
                 prevPos = pos + delsize + 1
                 yield refseq
+            elif vnt == '*': #del continue
+                continue
             else:
                 raise Caller_Error(f'unknown variant {vnt}')
         yield self.reference.fetch(reference=ctg,start=prevPos,end=end)

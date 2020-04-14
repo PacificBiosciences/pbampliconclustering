@@ -1,8 +1,9 @@
 import pysam
 from src.phase.phaser import Phaser,Phaser_Error
 from src.phase.split import Splitter_Error
-from src.phase.utils import getFileType,PhaseUtils_Error
-from src.utils.bam import addHPtag
+from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,PhaseUtils_Error
+from src.phase.caller import Caller_Error
+from src.utils.bam import addHPtag,getCoordinates
 
 DEFAULTPREFIX   = './longamp'
 DEFAULTMINREADS = 5
@@ -22,6 +23,8 @@ def main(parser):
     #Make sure the inputs are logically consistent with outputs
     ftype = getFileType(args.inFile)
     if args.reference is None:
+        if args.method == 'align':
+            raise LongAmpliconPhasing_Error('Need reference for this method')
         if args.variants:
             raise LongAmpliconPhasing_Error('Cannot export variant info without reference')
         if args.maxHP != 0 and args.method == 'align':
@@ -100,6 +103,14 @@ def main(parser):
         args.inBAM = args.inFile
         outBAM = f'{args.prefix}{s}hptagged.bam' 
         addHPtag(args,outBAM,phaser.clusterMap)
+        if args.region:
+            outBED = f'{args.prefix}{s}region.bed'
+            writeSimpleBED(*getCoordinates(args.region),
+                            args.sampleName,
+                            phaser.splitter.nReads,
+                            outBED)
+            outBAM = f'{args.prefix}{s}region.bam'
+            writeRegionBam(args.inFile,outBAM,args.region)
     #simple decision tree
     print('Writing Outputs')
     with open(f'{args.prefix}{s}clusterSplits.txt','w') as ofile:
@@ -172,7 +183,7 @@ class LongAmpliconPhasing_Error(Exception):
 
 
 if __name__ == '__main__':
-    import argparse
+    import argparse,sys
 
     parser = argparse.ArgumentParser(prog='LongAmpliconPhasing.py', description='Recursively separate amplicons by shared variants')
     parser.set_defaults(prog=parser.prog)

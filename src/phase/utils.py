@@ -29,6 +29,18 @@ def hpCollapse(maxLen=1):
                 yield char
     return lambda seq: ''.join(csgen(seq))
 
+def writeSimpleBED(chrm,start,stop,name,cov,filename,mode='w'):
+    with open(filename,mode) as ofile:
+        ofile.write('\t'.join(map(str,[chrm,start,stop,name,cov])) + '\n')
+
+def writeRegionBam(inBam,outBam,region):
+    with pysam.AlignmentFile(inBam) as ibam:
+        with pysam.AlignmentFile(outBam,'wb',template=ibam) as obam:
+            for rec in ibam.fetch(region=region):
+                obam.write(rec)
+    pysam.index(outBam)
+    return outBam
+
 class SimpleRecord:
     def __init__(self,name,sequence):
         self.name     = name
@@ -54,7 +66,9 @@ class RecordGenerator:
         else:
             recgen = bam
         for rec in recgen:
-            if rec.query_length >= self.minLen and rec.query_length <= self.maxLen:
+            if rec.query_length >= self.minLen \
+             and rec.query_length <= self.maxLen \
+             and not (rec.flag & 0x900):
                 yield SimpleRecord(rec.query_name,rec.query_sequence)
 
     def _fastxIter(self,fastx,**kwargs):
