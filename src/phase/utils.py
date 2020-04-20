@@ -12,7 +12,7 @@ def getFileType(fname):
     if ext == 'bam':
         return 'bam'
     elif ext in ['fastq','fq','fasta','fa']:
-        return 'fastq'
+        return 'fastx'
     else:
         raise PhaseUtils_Error(f'unknown filetype extension: {ext}')
 
