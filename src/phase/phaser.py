@@ -7,10 +7,11 @@ from scipy.stats import entropy
 
 class Phaser:
     def __init__(self,splitter,sampleName,
-                 aggressive=False):
+                 aggressive=False,log=None):
         self.sampleName = sampleName   #sample name
         self.aggressive = aggressive   #aggressively separate groups
         self.splitter   = splitter     #split generator
+        self.log        = log
         #################
         self.vTree      = None
         self.pending    = []
@@ -23,13 +24,17 @@ class Phaser:
 
     def run(self):
         #initialize starting conditions
-        print('Initializing Tree')
+        msg = 'Initializing Tree'
+        if self.log:
+            self.log.info('Initializing Tree')
         self._initGroups()
         #split groups
-        print('Splitting Groups')
+        if self.log:
+            self.log.info('Splitting Groups')
         self._splitGroups()
         # identify residual node and dump in noise bin
-        print('Cleaning Up')
+        if self.log:
+            self.log.info('Cleaning Up')
         #self._dumpResidual()
         #get clusters
         self._getClusters()
@@ -46,6 +51,8 @@ class Phaser:
                         split=self.sampleName,
                         pending=-True)
         #group tree
+        if self.log:
+            self.log.debug(f'Starting vTree with {root}')
         self.vTree = vTree(root)
         #reads matching reference at all selected pos
         #refcall = self.sigVar.index[(self.sigVar == '.').all(axis=1)]
@@ -57,6 +64,8 @@ class Phaser:
                                for node in self.vTree.nodes.values() 
                                if node.pending],
                               reverse=True)
+        if self.log:
+            self.log.debug(f'Pending nodes: {self.pending}')
     
     def _splitGroups(self):
         #func to det if big enough to split
@@ -69,6 +78,8 @@ class Phaser:
             self.vTree[label].pending = False
             testSet = set(self.vTree[label].reads)
             subset,pos,vnt = self.splitter.split(testSet)
+            if self.log and subset is not None:
+                self.log.debug(f'Attenmpting to split {self.vTree[label]}; split: {len(subset)},{pos},{vnt}')
             if subset is None:
                 continue
                 #self.vTree[label].pending = False
@@ -92,9 +103,9 @@ class Phaser:
         return
 
     def _isRefCall(self,lbl):
-        plrty = self.splitter.sigVar.loc[self.vTree[lbl].reads]\
+        plrty = self.splitter.sigVar.reindex(self.vTree[lbl].reads)\
                              .apply(pd.Series.value_counts).fillna(0).idxmax()
-        return (plrty== '.').all()
+        return (plrty.astype(str)== '.').all()
 
     def _getClusters(self):
         '''map of node label -> cluster'''

@@ -14,7 +14,7 @@ class VariantGrouper:
                  minCov=1,minFrac=0.1,
                  minReads=10,minSpan=0.9,
                  minSignal=0.05,flagFilter=0x900,
-                 aggressive=False,vTable=None):
+                 aggressive=False,vTable=None,log=None):
         self.bamfile    = self._checkBam(inFile)   #bam file
         self.refFasta   = refFasta           #ref
         self.region     = region             #region eg X:12345-678900
@@ -26,6 +26,7 @@ class VariantGrouper:
         self.minSignal  = minSignal          #min frac of reads that are diff from ref to consider
         self.flagFilter = flagFilter         #hex filters, passed to pysam.pileup engine
         self.aggressive = aggressive
+        self.log        = log
         self.vTable     = vTable if vTable is not None else self._makeDf()
         self.sigVar     = self._makeSigVar()
         self.nReads     = len(self.sigVar)
@@ -37,6 +38,8 @@ class VariantGrouper:
         
     def _getSignalPos(self,vdf):
         #identify positions with signal
+        if self.log:
+            self.log.info('Reducing feature space')
         matchOrNa   = ((vdf == '.') | (vdf == ',') | vdf.isna())
         fracVar     = (~matchOrNa).sum(axis=0)/len(vdf)
         return vdf.columns[fracVar >= self.minSignal]
@@ -55,6 +58,8 @@ class VariantGrouper:
         
     def _makeDf(self):
         '''DF with read names as index and ref positions as columns and variants as elements'''
+        if self.log:
+            self.log.info('Reading alignments from input BAM')
         bam = pysam.AlignmentFile(self.bamfile,'r')
         ref = pysam.FastaFile(self.refFasta)
         df  = pd.DataFrame({(column.reference_name,
@@ -87,11 +92,13 @@ class VariantGrouper:
             maxReads = len(reads) - 1
         else:
             maxReads = len(reads) - self.minCount
-        vTable = self.sigVar.loc[reads]
+        #vTable = self.sigVar.loc[reads]
+        vTable = self.sigVar.reindex(reads)
         counts = vTable.apply(pd.Series.value_counts).fillna(0)
         for ch in '.*':
             if ch in counts.index:
                 counts.drop(ch,inplace=True)
+        counts.drop(columns=counts.columns[counts.sum()==0],inplace=True)
         ent = counts.apply(lambda p: p.sum()*entropy(p.dropna()))\
                     .sort_values(ascending=False)
         for pos in ent.index:
@@ -105,12 +112,13 @@ class VariantGrouper:
         return None,None,None
 
 class sparseDBG:
-    def __init__(self,k,collapse=1,ignoreEnds=0,minReads=5,minFrac=0.1):
+    def __init__(self,k,collapse=1,ignoreEnds=0,minReads=5,minFrac=0.1,log=None):
         self.parser   = seqParser(k,collapse,ignoreEnds=ignoreEnds)
         self.k        = k
         self.collapse = collapse
         self.minReads = minReads
         self.minFrac  = minFrac
+        self.log      = log
         self.nodes    = {}
 
     def __repr__(self):
@@ -129,6 +137,8 @@ class sparseDBG:
         self.nReads    = len(self.readnames)
         self.minCount  = max(ceil(self.minFrac*self.nReads),self.minReads)
         allNodes       = {}
+        if self.log:
+            self.log.info('Building debruijn graph')
         for i,rec in enumerate(recGen):
             for kmer in self.parser(rec.sequence):
                 nseq = kmer[:-1]

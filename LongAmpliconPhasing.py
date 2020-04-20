@@ -4,6 +4,7 @@ from src.phase.split import Splitter_Error
 from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,PhaseUtils_Error
 from src.phase.caller import Caller_Error
 from src.utils.bam import addHPtag,getCoordinates
+from src.utils.logging import getLogger
 
 DEFAULTPREFIX   = './longamp'
 DEFAULTMINREADS = 5
@@ -19,6 +20,13 @@ MAXCOMPRESSSIZE = 500000
 
 def main(parser):
     args = parser.parse_args()
+    
+    #exporting prefix
+    s      = '' if args.prefix.endswith('/') else '.'
+    prefix = f'{args.prefix}{s}'
+
+    #logging
+    log = getLogger('lap',f'{prefix}laphase.log',stdout=args.verbose)
 
     #Make sure the inputs are logically consistent with outputs
     ftype = getFileType(args.inFile)
@@ -28,7 +36,7 @@ def main(parser):
         if args.variants:
             raise LongAmpliconPhasing_Error('Cannot export variant info without reference')
         if args.maxHP != 0 and args.method == 'align':
-            print(f'WARNING: compressed reads will be realigned to {args.template} input read')
+            log.warning(f'compressed reads will be realigned to {args.template} input read')
     else:
         if args.maxHP !=0 and args.method=='align':
             refLens = [len(rec.sequence) for rec in pysam.FastxFile(args.reference)]
@@ -40,10 +48,10 @@ def main(parser):
             if args.region is not None:
                 raise LongAmpliconPhasing_Error('Region option can only be used with BAM input')
             if args.method == 'debruijn':
-                print('WARNING: Reads should be oriented before running')
+                log.warning('Reads should be oriented before running')
         else:
             if args.maxHP !=0 and args.method=='align':
-                print('WARNING: Reads will be realigned after compression')
+                log.warning('Reads will be realigned after compression')
          
     #########
 
@@ -58,7 +66,8 @@ def main(parser):
                             method=args.template,
                             minLength=args.minLength,
                             maxLength=args.maxLength,
-                            maxHP=args.maxHP).varDf
+                            maxHP=args.maxHP,
+                            log=log).varDf
     else:
         varDf = None
 
@@ -74,14 +83,14 @@ def main(parser):
                                   minSignal=args.minSignal,
                                   flagFilter=args.flagFilter,
                                   aggressive=args.aggressive,
-                                  vTable=varDf)
+                                  vTable=varDf,log=log)
     elif args.method == 'debruijn':
         from src.phase.split import sparseDBG
         splitter = sparseDBG(args.k,
                              collapse=args.maxHP,
                              ignoreEnds=args.ignore,
                              minReads=args.minReads,
-                             minFrac=args.minFrac)
+                             minFrac=args.minFrac,log=log)
         splitter.loadReads(args.inFile,
                            region=args.region,
                            minLength=args.minLength,
@@ -91,32 +100,34 @@ def main(parser):
 
     phaser = Phaser(splitter,
                     args.sampleName,
-                    aggressive=args.aggressive)
+                    aggressive=args.aggressive,
+                    log=log)
     phaser.run()
     
     #export stuff
-    s = '' if args.prefix.endswith('/') else '.'
     #bam
     if not args.noBam and ftype == 'bam':
-        print('Writing BAM(s)')
+        log.info('Writing clustered BAM(s)')
         #hacky
         args.inBAM = args.inFile
-        outBAM = f'{args.prefix}{s}hptagged.bam' 
+        outBAM = f'{prefix}hptagged.bam' 
         addHPtag(args,outBAM,phaser.clusterMap)
         if args.region:
-            outBED = f'{args.prefix}{s}region.bed'
+            log,info('Writing region BAM')
+            outBED = f'{prefix}region.bed'
             writeSimpleBED(*getCoordinates(args.region),
                             args.sampleName,
                             phaser.splitter.nReads,
                             outBED)
-            outBAM = f'{args.prefix}{s}region.bam'
+            outBAM = f'{prefix}region.bam'
             writeRegionBam(args.inFile,outBAM,args.region)
     #simple decision tree
-    print('Writing Outputs')
-    with open(f'{args.prefix}{s}clusterSplits.txt','w') as ofile:
+    log.info('Writing Splits')
+    with open(f'{prefix}clusterSplits.txt','w') as ofile:
         ofile.write(f'{str(phaser)}\n')
     #cluster file/readnames
-    with open(f'{args.prefix}{s}clusters.txt','w') as ofile:
+    log.info('Writing Cluster file')
+    with open(f'{prefix}clusters.txt','w') as ofile:
         for node,clust in phaser.node2cluster.items():
             vclust = phaser.vTree[node]
             ofile.write(f'>{vclust.clusterName()}\n')
@@ -124,13 +135,14 @@ def main(parser):
     #check if anything was produced, else exit
     hasResults = True
     if len(phaser.node2cluster) == 0:
-        print(f'WARNING: No results produced for sample {phaser.sampleName}.  Nreads: {phaser.splitter.nReads}')
+        log.warning(f'No results produced for sample {phaser.sampleName}.  Nreads: {phaser.splitter.nReads}')
         hasResults = False
     #variants/consensus
     if args.variants:
         from src.phase.caller import VariantCaller,FIGFORMAT 
         if args.method == 'debruijn' or args.maxHP != 0:
             #need to build the variant splitter
+            log.info('Building uncompressed variant table from bam')
             from src.phase.split import VariantGrouper
             vsplitter = VariantGrouper(args.inFile,
                                        args.reference,
@@ -152,17 +164,21 @@ def main(parser):
                                   phaser.clusterMap,
                                   endpoints)
         #summary table
+        log.info('Writing Cluster Summary')
         name = f'{args.prefix}{s}alleleClusterSummary.csv'
         caller.alleleFrequency(caller.clusterMap).to_csv(name)
+        log.info('Writing Sample Variant Summary')
         name = f'{args.prefix}{s}sampleVariantSummary.csv'
         caller.alleleFrequency(caller.variantGroupMap)\
               .reindex(list(set(caller.variantGroupMap.values())))\
               .to_csv(name)
         
         #total allele fractions (draft)
+        log.info('Writing Variant Fraction File')
         name = f'{args.prefix}{s}variantFraction.csv'
         caller.variantFractions.to_csv(name)
         #draft consensus
+        log.info('Generating draft consensus')
         name = f'{args.prefix}{s}draft.consensus.fasta'
         with open(name,'w') as ofasta:
             for clust,seq in caller.draftConsensus().items():
@@ -170,11 +186,17 @@ def main(parser):
                 ofasta.write(f'>cluster{clust}.plurality\n')
                 ofasta.write(seq + '\n')
         #entropy
+        log.info('Writing entropy table')
         name = f'{args.prefix}{s}entropy.csv'
         caller.entropy.to_csv(name)
         if args.entropyPlot:
+            log.info('Writing entropy heatmap')
             name = f'{args.prefix}{s}entropy.{FIGFORMAT}'
             caller.entropyPlot(name)
+    
+    for handler in log.handlers:
+        handler.close()
+        log.removeFilter(handler)
 
     return phaser
                                  
@@ -233,6 +255,8 @@ if __name__ == '__main__':
                     help='Method for choosing reference template from inputs (if no reference passed). Default median')
     parser.add_argument('-m','--method', dest='method', choices=['align','debruijn'], default='align',
                     help='Splitting method.  If align and maxHP != 0, reads will be realigned after compression for clustering; Output variants are from non-compressed pileup. Default align')
+    parser.add_argument('--verbose', dest='verbose', action='store_true', default=False,
+                    help='Print progress messages to stdout. Default False')
 #    parser.add_argument('-c','--minCov', dest='minCov', type=int, default=DEFAULTMINCOV,
 #                    help=f'Minimum read coverage to include position.  Default {DEFAULTMINCOV}')
 #    parser.add_argument('-S','--minSpan', dest='minSpan', type=float, default=DEFAULTMINSPAN,

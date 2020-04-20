@@ -81,11 +81,12 @@ class RecordGenerator:
 
 class PilerUpper:
     def __init__(self,inFile,region=None,refSeq=None,method='median',
-                 minLength=50,maxLength=1e6,maxHP=1):
+                 minLength=50,maxLength=1e6,maxHP=1,log=None):
         self.recGen    = RecordGenerator(inFile,region=region,
                                          minLength=minLength,
                                          maxLength=maxLength)
         self.collapse  = hpCollapse(maxHP) if maxHP else (lambda x:x)
+        self.log       = log
         self.refseq    = self._getRef(refSeq,method)
         self.aligner   = self._getAligner()
         self.varDf     = self._fillVDF()
@@ -115,7 +116,8 @@ class PilerUpper:
         return list(self.aligner.map(self.collapse(seq),cs=True))[0]
     
     def _fillVDF(self):
-        print('Reading Variants')
+        if self.log:
+            self.log.info('Aligning compressed reads')
         return pd.concat([self.expandCS(self.map(rec.sequence),
                                         name=rec.name)
                           for rec in self.recGen],
