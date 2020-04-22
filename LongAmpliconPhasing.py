@@ -1,4 +1,4 @@
-import pysam
+import pysam,sys
 from src.phase.phaser import Phaser,Phaser_Error
 from src.phase.split import Splitter_Error
 from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,PhaseUtils_Error
@@ -27,6 +27,7 @@ def main(parser):
 
     #logging
     log = getLogger('lap',f'{prefix}laphase.log',stdout=args.verbose)
+    log.debug(f'Command: {" ".join(sys.argv)}')
 
     #Make sure the inputs are logically consistent with outputs
     ftype = getFileType(args.inFile)

@@ -79,7 +79,7 @@ class Phaser:
             testSet = set(self.vTree[label].reads)
             subset,pos,vnt = self.splitter.split(testSet)
             if self.log and subset is not None:
-                self.log.debug(f'Attenmpting to split {self.vTree[label]}; split: {len(subset)},{pos},{vnt}')
+                self.log.debug(f'Attempting to split {self.vTree[label]}; split: {len(subset)},{pos},{vnt}')
             if subset is None:
                 continue
                 #self.vTree[label].pending = False

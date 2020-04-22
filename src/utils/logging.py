@@ -1,7 +1,7 @@
 import logging,sys
 
 def getLogger(name,filename,stdout=False):
-    logger = logging.getLogger('laphasing')
+    logger = logging.getLogger(name)
     formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
     fhandler  = logging.FileHandler(filename=filename,mode='w')
     fhandler.setLevel(logging.DEBUG)
