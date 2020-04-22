@@ -114,7 +114,7 @@ def main(parser):
         outBAM = f'{prefix}hptagged.bam' 
         addHPtag(args,outBAM,phaser.clusterMap)
         if args.region:
-            log,info('Writing region BAM')
+            log.info('Writing region BAM')
             outBED = f'{prefix}region.bed'
             writeSimpleBED(*getCoordinates(args.region),
                             args.sampleName,
