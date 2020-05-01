@@ -15,7 +15,7 @@ class VariantGrouper:
                  minReads=10,minSpan=0.9,
                  minSignal=0.05,flagFilter=0x900,
                  aggressive=False,vTable=None,log=None):
-        self.bamfile    = self._checkBam(inFile)   #bam file
+        self.bamfile    = inFile             #bam file
         self.refFasta   = refFasta           #ref
         self.region     = region             #region eg X:12345-678900
         self.truncate   = truncate           #truncate pileup to region (pysam pileup kwarg)
@@ -31,7 +31,7 @@ class VariantGrouper:
         self.sigVar     = self._makeSigVar()
         self.nReads     = len(self.sigVar)
         self.minCount   = self._getMinCount()
-        self.readnames  = self.vTable.index
+        self.readnames  = self.sigVar.index
         
     def __repr__(self):
         return f'VariantGrouper: {self.bamfile}'
@@ -58,6 +58,7 @@ class VariantGrouper:
         
     def _makeDf(self):
         '''DF with read names as index and ref positions as columns and variants as elements'''
+        self._checkBam(self.bamfile)
         if self.log:
             self.log.info('Reading alignments from input BAM')
         bam = pysam.AlignmentFile(self.bamfile,'r')

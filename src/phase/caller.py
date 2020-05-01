@@ -8,7 +8,7 @@ FIGFORMAT= 'pdf'
 MINCOUNT = 3 #absolute minimum shared min variants
 
 class VariantCaller:
-    def __init__(self,sigVar,minCount,reference,clusterMap,endPoints):
+    def __init__(self,sigVar,minCount,reference,clusterMap,endPoints,log=None):
         self.vTable     = sigVar
         self.minCount   = minCount
         self.reference  = pysam.FastaFile(reference)
@@ -16,6 +16,7 @@ class VariantCaller:
         self.endPoints  = endPoints
         self.readCounts = Counter(self.clusterMap.values())
         self.totalReads = len(self.vTable)
+        self.log        = log
     
     def _getVarCounts(self,vtbl,fillna=True):
         res = vtbl.apply(pd.Series.value_counts)
@@ -49,10 +50,13 @@ class VariantCaller:
         else:
             varGrpMap = {}
         for vkey in vkeys:
-            if len(varGroups.get_group(vkey)) >= MINCOUNT:
+            size = len(varGroups.get_group(vkey))
+            if size >= MINCOUNT:
                 cnumber = clust
                 clust  += 1
             else:
+                if self.log:
+                    self.log.debug(f'Assigning variant tuple {vkey} as noise (size={size})')
                 cnumber = -1 #noise
             varGrpMap.update({r:cnumber for r in varGroups.get_group(vkey).index})
         return varGrpMap

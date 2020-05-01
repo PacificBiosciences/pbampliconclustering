@@ -3,7 +3,7 @@ from src.phase.phaser import Phaser,Phaser_Error
 from src.phase.split import Splitter_Error
 from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,PhaseUtils_Error
 from src.phase.caller import Caller_Error
-from src.utils.bam import addHPtag,getCoordinates
+from src.utils.bam import addHPtag,getCoordinates,exportFastq
 from src.utils.logging import getLogger
 
 DEFAULTPREFIX   = './longamp'
@@ -32,8 +32,8 @@ def main(parser):
     #Make sure the inputs are logically consistent with outputs
     ftype = getFileType(args.inFile)
     if args.reference is None:
-        if args.method == 'align':
-            raise LongAmpliconPhasing_Error('Need reference for this method')
+        #if args.method == 'align':
+        #    raise LongAmpliconPhasing_Error('Need reference for this method')
         if args.variants:
             raise LongAmpliconPhasing_Error('Cannot export variant info without reference')
         if args.maxHP != 0 and args.method == 'align':
@@ -82,7 +82,6 @@ def main(parser):
                                   minFrac=args.minFrac,
                                   minReads=args.minReads,
                                   minSignal=args.minSignal,
-                                  flagFilter=args.flagFilter,
                                   aggressive=args.aggressive,
                                   vTable=varDf,log=log)
     elif args.method == 'debruijn':
@@ -122,6 +121,15 @@ def main(parser):
                             outBED)
             outBAM = f'{prefix}region.bam'
             writeRegionBam(args.inFile,outBAM,args.region)
+    #fastq
+    if args.exportFq:
+        if args.inFile.endswith('a'):
+            log.warning('Cannot export fasta from fasta')
+        else:
+            ft = 'bam' if args.inFile.endswith('bam') else 'fastq'   
+            log.info("Exporting Fastq files")
+            exportFastq(args.inFile,ft,args.prefix,
+                        phaser.clusterMap,region=args.region)
     #simple decision tree
     log.info('Writing Splits')
     with open(f'{prefix}clusterSplits.txt','w') as ofile:
@@ -152,9 +160,8 @@ def main(parser):
                                        minFrac=args.minFrac,
                                        minReads=args.minReads,
                                        minSignal=args.minSignal,
-                                       flagFilter=args.flagFilter,
                                        aggressive=args.aggressive,
-                                       vTable=None)
+                                       vTable=None,log=log)
         else:
             vsplitter = splitter
 
@@ -163,7 +170,8 @@ def main(parser):
                                   vsplitter.minCount,
                                   args.reference,
                                   phaser.clusterMap,
-                                  endpoints)
+                                  endpoints,
+                                  log=log)
         #summary table
         log.info('Writing Cluster Summary')
         name = f'{args.prefix}{s}alleleClusterSummary.csv'
@@ -250,8 +258,8 @@ if __name__ == '__main__':
                     help='More aggressively split groups (experimental).  Default False')
     parser.add_argument('-e','--entropyPlot', dest='entropyPlot', action='store_true', default=False,
                     help='Generate heatmap of entropy for clusters.  Default False')
-    parser.add_argument('-F','--flagFilter', dest='flagFilter', type=hex, default=0x900,
-                    help='Filter to pass to pysam.pileup. Default 0x900')
+    parser.add_argument('-F','--exportFastq', dest='exportFq', action='store_true', default=False,
+                    help='Export Fastq per phase. Default False')
     parser.add_argument('--template', dest='template', choices=['first','median'], default='median',
                     help='Method for choosing reference template from inputs (if no reference passed). Default median')
     parser.add_argument('-m','--method', dest='method', choices=['align','debruijn'], default='align',

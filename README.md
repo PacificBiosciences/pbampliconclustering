@@ -1,6 +1,8 @@
-# Tools for clustering of PacBio CCS reads
+# Tools for clustering and phasing of PacBio CCS reads
 
 This repo contains python3 tools to cluster PB CCS reads using kmer counts and clustering algorithms provided by the [Python Scikit-learn machine learning toolset](https://scikit-learn.org/stable/index.html).  The primary use case is for amplicon data, where reads cover a specific region in a reference dataset. For non-targeted data, options are provided to cluster any mapped sequence data covering a defined region in a reference sequence (i.e. WGS data).
+
+An alternate tool `LongAmpliconPhasing.py` recently added provides a variant splitting and phasing model for phasing PacBio HiFi/CCS targeted reads.  
 
 ## Dependencies
 
@@ -12,6 +14,102 @@ Python 3 is used to take full advantage of the scikit-learn library.  The follow
  * [mappy](https://pypi.org/project/mappy/)
  * [matplotlib](https://matplotlib.org/)
  * [seaborn](https://seaborn.pydata.org/)
+
+
+
+# Long Amplicon Phasing
+
+A program for splitting PacBio HiFi reads using shared variants.  This tool will split groups of reads sharing a single variant, including SNV and indels of >20bp in size.  Large insertions, sometimes called structural variants (SV), within amplicon target regions of >1kb can be separated with this tool.
+
+Two models are provided for splitting reads: `align` and `debruijn`.  The align model identifies variants using alignments to a reference *or* by selecting an exemplar read to which all other reads are aligned.  The debruijn model generates a debruijn graph from kmers and splits along graph edges one node at a time.
+
+For general help, see `LongAmpliconPhasing.py -h`.
+
+Example:
+    [coming soon]
+
+## Quickstart
+
+The most important parameters for all models are the settings for minimum output group sizes, as well as initial data reduction.
+
+The minimum cluster size is determined by the parameters `-r,--minReads`, `-f, --minFrac`, and the input read count after filtering.  Minimum size is defined as `max( ceil( minFrac * nReads ), minReads )`.
+
+For the `align` method, the parameter `-g,--minSignal` determines how reference positions are filtered prior to splitting.  Only positions for which at least `minSignal` fraction of reads are different from the reference will be considered as candidates for splitting groups. In general, `-g` should be set <= `-f`.  
+
+Note that any read that does not cover _all candidate positions_ will be filtered from the phasing process.
+
+Align example using defaults
+
+    $ python3 LongAmpliconPhasing.py -m align -p outdir/example --reference myref.fasta aligned.bam mySampleName
+
+Debruijn example using defaults
+
+    $ python3 LongAmpliconPhasing.py -m debruijn -p outdir/example input[.bam|.fastq] mySampleName 
+
+## Sequence outputs
+
+### BAM
+BAM outputs (with BAM input) can be single or one per cluster (`--splitBam`). Use the `-d` option to drop any read which is not assigned a cluster number (reads outside of the region, if any, secondary/supplementary alignments, partial coverage reads, etc). To turn off all bam export, use the `-x` flag.
+
+### FASTQ
+Use the `-F` option to exort one fastq file per cluster.
+
+### clusters.txt
+Listing of read assignments by cluster in faux-fasta format.  
+
+    >cluster0_numreads111
+    <readname>
+    <readname>
+    ...
+
+### clusterSplits.txt
+Simple graph output defining algorithm decision for phasing variants. 
+
+## Variant Reports
+
+When using a reference with either `align` or `debruijn` method and an aligned bam as input, use the `-v` option to return a set of reports and draft consensus sequences for clustered reads.  When using the debruijn method and/or compressing homopolymers, the input aligned bam will be used for generating variant calls per cluster after phasing.
+
+### alleleClusterSummary.csv
+This table summarizes the read clusters identified by the program.  Cluster `0` will _always_ represent reads that match the reference sequence at all candidate positions (see `minSignal`).  Phased reads with 1 or more variants with respect to the reference begin with cluster number `1` and are sorted in descending number of reads.   
+
+Variant calls in each column of this table represent a simple plurality given the reads in the cluster.  
+
+    $ column -ts, output/example.alleleClusterSummary.csv
+    contig   HTT_region_hg19  HTT_region_hg19         HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  nReads  frequency
+    pos      915              2723                    2774             2779             2782             2785             2792             3495
+    cluster
+    1        .                .-6CAGCAG               .                .                .                .                .                .                55      0.4135
+    2        G                .-18CAGCAGCAGCAGCAGCAG  A                C                C                C                G                G                42      0.3157
+    3        .                .-3CAG                  .                .                .                .                .                .                21      0.1578
+    4        G                .                       *                C                .                .                G                G                15      0.1127
+
+### sampleVariantSummary.csv
+This table is a count of all unique combinations of variants in the dataset, given the candidate positions as described above for `minSignal`.  Reads matching the reference at all positions are labeled cluster `0`, and all other combinations are sorted by number of reads.  There is a hard cut-off of `3` reads such that all unique combinations whith fewer than 3 reads are labeled as a single noise group `-1`.  Actual combinations assigned `-1` can be viewd in the log file.  
+
+    $ column -ts, output/example.sampleVariantSummary.csv
+    contig   HTT_region_hg19  HTT_region_hg19         HTT_region_hg19     HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  HTT_region_hg19  nReads  frequency
+    pos      915              2723                    2758                2761             2763             2773             2774             2779             2782             2785             2792             3495
+    cluster
+    0        .                .                       .                   .                .                .                .                .                .                .                .                .                5       0.0375
+    1        .                .-6CAGCAG               .                   .                .                .                .                .                .                .                .                .                47      0.3533
+    2        G                .-18CAGCAGCAGCAGCAGCAG  .                   .                .                .                A                C                C                C                G                G                40      0.3007
+    3        .                .-3CAG                  .                   .                .                .                .                .                .                .                .                .                8       0.0601
+    4        .                .-6CAGCAG               .                   .                .                .                .                .                .                .                .                .+1G             5       0.0375
+    5        .                .-3CAG                  .                   .                .                .                .                .                .                .                .                .+1G             4       0.0300
+    6        G                .                       .-14GCAGCAGCAGCAGC  *                *                .-1G             *                C                C                C                G                G                4       0.0300
+    7        G                .                       .                   C                .-11AGCAGCAGCAG  *                *                C                *                *                G                G                3       0.0225
+    -1       G                .                       .                   .                .                .                .                .                .                .                .+9CCGCCGCCG     G                17      0.1278
+
+### variantFraction.csv
+(Draft) Total variant fraction for each position, regardless of cluster.
+
+### entropy.csv
+This table shows the entropy score for each position for each cluster, where entropy is calculated as shannon diversity of calls at a position within a cluster.  High values in this table indicate position/clusters which may be incompletely separated, or include noisy calling regions.  This table can be visualized as a heatplot with the option `-e`.
+
+### laphase.log
+Log of algorithm execution.  See for details of splitting.
+
+# Cluster Amplicons
 
 ## Quickstart
 

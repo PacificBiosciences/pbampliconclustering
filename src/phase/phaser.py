@@ -24,7 +24,6 @@ class Phaser:
 
     def run(self):
         #initialize starting conditions
-        msg = 'Initializing Tree'
         if self.log:
             self.log.info('Initializing Tree')
         self._initGroups()
@@ -117,6 +116,8 @@ class Phaser:
             leaf = self.vTree[lbl]
             if len(leaf) < self.splitter.minCount:
                 #dump in noise bin
+                if self.log:
+                    self.log.debug(f'{leaf} has fewer than {self.splitter.minCount} reads. Labelled as "noise"(-1)')
                 self.vTree.noise.update(leaf.reads)
                 leaf.setNoise()
             elif isRefcall(lbl):
@@ -132,8 +133,7 @@ class Phaser:
                                      self.vTree.leaves),
                               key=lambda n:-len(self.vTree[n]))
         self.node2cluster.update({node : idx + offset 
-                                  for idx,node in enumerate(sortedLeaves)
-                                  if not (self.vTree[node]._isNoise or self.vTree[node]._isRefCall)})
+                                  for idx,node in enumerate(sortedLeaves)})
         #update nodes
         for node,clust in self.node2cluster.items():
             self.vTree[node].set_cluster(clust)
