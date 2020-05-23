@@ -51,7 +51,7 @@ class Phaser:
                         pending=-True)
         #group tree
         if self.log:
-            self.log.debug(f'Starting vTree with {root}')
+            self.log.debug(f'Starting vTree with {root}. Minimum reads: {self.splitter.minCount}')
         self.vTree = vTree(root)
         #reads matching reference at all selected pos
         #refcall = self.sigVar.index[(self.sigVar == '.').all(axis=1)]
@@ -78,7 +78,7 @@ class Phaser:
             testSet = set(self.vTree[label].reads)
             subset,pos,vnt = self.splitter.split(testSet)
             if self.log and subset is not None:
-                self.log.debug(f'Attempting to split {self.vTree[label]}; split: {len(subset)},{pos},{vnt}')
+                self.log.debug(f'{self.vTree[label]} split: {len(subset)},{pos},{vnt}')
             if subset is None:
                 continue
                 #self.vTree[label].pending = False

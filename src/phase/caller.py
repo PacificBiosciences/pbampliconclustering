@@ -46,9 +46,9 @@ class VariantCaller:
         if refCall in vkeys:
             varGrpMap = {r:clust for r in varGroups.get_group(refCall).index}
             vkeys.pop(vkeys.index(refCall))
-            clust += 1
         else:
             varGrpMap = {}
+        clust += 1
         for vkey in vkeys:
             size = len(varGroups.get_group(vkey))
             if size >= MINCOUNT:
@@ -152,7 +152,7 @@ class VariantCaller:
         #catch when everything is identical
         if not np.all(ent.isna().values):
             sns.heatmap(self.entropy,ax=ax,cbar_kws={'label': 'Entropy'})
-            plt.tight_layout()
+            #plt.tight_layout()
         else:
             pass
         f.savefig(savename,dpi=400,format=FIGFORMAT)

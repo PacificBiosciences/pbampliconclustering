@@ -1,4 +1,4 @@
-import pysam
+import pysam,os
 from math import ceil
 import pandas as pd
 import numpy as np
@@ -6,7 +6,12 @@ from collections import Counter
 from scipy.stats import entropy
 from operator import itemgetter
 from collections import defaultdict
+from sklearn.cluster import SpectralClustering
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils.validation import check_symmetric
 from .utils import hpCollapse,RecordGenerator
+
+DIAGNOSTICS=False
 
 class VariantGrouper:
     def __init__(self,inFile,refFasta,
@@ -14,7 +19,10 @@ class VariantGrouper:
                  minCov=1,minFrac=0.1,
                  minReads=10,minSpan=0.9,
                  minSignal=0.05,flagFilter=0x900,
-                 aggressive=False,vTable=None,log=None):
+                 aggressive=False,indels=True,
+                 vTable=None,nproc=1,prefix=None,
+                 makeDf=None,log=None,stats={},
+                 diagnostics=DIAGNOSTICS):
         self.bamfile    = inFile             #bam file
         self.refFasta   = refFasta           #ref
         self.region     = region             #region eg X:12345-678900
@@ -26,26 +34,35 @@ class VariantGrouper:
         self.minSignal  = minSignal          #min frac of reads that are diff from ref to consider
         self.flagFilter = flagFilter         #hex filters, passed to pysam.pileup engine
         self.aggressive = aggressive
+        self.indels     = indels             #use indels for variants
+        self.nproc      = nproc
+        self.prefix     = prefix
+        self.makeDf     = makeDf             #pickle-able function for parallel processing
         self.log        = log
+        self.stats      = stats
         self.vTable     = vTable if vTable is not None else self._makeDf()
         self.sigVar     = self._makeSigVar()
-        self.nReads     = len(self.sigVar)
         self.minCount   = self._getMinCount()
         self.readnames  = self.sigVar.index
+        if diagnostics:
+            self._runDiagnostics()
         
     def __repr__(self):
         return f'VariantGrouper: {self.bamfile}'
         
     def _getSignalPos(self,vdf):
         #identify positions with signal
-        if self.log:
-            self.log.info('Reducing feature space')
         matchOrNa   = ((vdf == '.') | (vdf == ',') | vdf.isna())
+        if not self.indels:
+            #don't count indels
+            matchOrNa |= vdf.apply(lambda pos:pos.str.contains('\+|-')).fillna(False)
         fracVar     = (~matchOrNa).sum(axis=0)/len(vdf)
+        if self.log:
+            self.log.info(f'Reducing feature space: using {sum(fracVar >= self.minSignal)} positions')
         return vdf.columns[fracVar >= self.minSignal]
     
     def _getMinCount(self):
-        return max(self._minReads,ceil(self._minFrac*self.nReads))    
+        return max(self._minReads,ceil(self._minFrac*self.stats['clustered reads']))    
     
     def _checkBam(self,inFile):
         #weak check
@@ -55,29 +72,99 @@ class VariantGrouper:
     def _sanitizeValues(self,vdf):
         '''homogenize across strands and drop reads not covering all selected pos'''
         return vdf.apply(self._homogenizeStrands).dropna(axis='index',how='any')
-        
+    
     def _makeDf(self):
-        '''DF with read names as index and ref positions as columns and variants as elements'''
-        self._checkBam(self.bamfile)
         if self.log:
-            self.log.info('Reading alignments from input BAM')
-        bam = pysam.AlignmentFile(self.bamfile,'r')
-        ref = pysam.FastaFile(self.refFasta)
-        df  = pd.DataFrame({(column.reference_name,
-                             column.reference_pos)  : dict(zip(column.get_query_names(),
-                                                            column.get_query_sequences(mark_matches=True,
-                                                                                       add_indels=True)))
-                            for column in bam.pileup(flag_filter=self.flagFilter,
-                                                     fastafile=ref,region=self.region,
-                                                     truncate=self.truncate,
-                                                     min_base_quality=0)
-                            if len(column.get_query_names()) >= self.minCov})
-        df.columns.names = ('contig','pos')
-        return df
+            self.log.info(f'Reading alignments from input BAM using {self.nproc} procs')
+        if self.nproc == 1:
+            df  = self.makeDf(self.bamfile,self.refFasta,self.region,self.truncate)
+            bam = pysam.AlignmentFile(self.bamfile) 
+            self.stats['total alignments'] = bam.count()
+            bam.reset()
+            self.stats['primary alignments'] = sum(1 for r in bam if not r.flag & 0x900)
+            self.stats['pileup alignments'] = len(df)
+            return df            
+        else:
+            from multiprocessing import Pool
+            pool     = Pool(self.nproc)
+            result   = []
+            for chunk in self.chunkBam():
+                callback = self._chunkCallback(chunk,result)
+                pool.apply_async(self.makeDf,
+                                 args=(chunk,self.refFasta),
+                                 callback=callback) 
+            pool.close()
+            pool.join()
+            res = pd.concat(result)
+            self.stats['pileup alignments'] = len(res)
+            return res
+
+    def _chunkCallback(self,chunk,out):
+        def f(res):
+            if self.log:
+                self.log.debug(f'Finished reading {chunk}')
+            out.append(res)
+            os.remove(chunk)
+            os.remove(f'{chunk}.bai')
+        return f
+
+    def chunkBam(self):
+        outFmt = f'{self.prefix}chunk{{}}.bam'
+        chunk  = 0
+        oname  = outFmt.format(chunk)
+        chunks = [oname]
+        secNsup = 0
+        with pysam.AlignmentFile(self.bamfile) as inBam:
+            nreads = inBam.count(region=self.region)
+            breaks = np.linspace(0,nreads,self.nproc+1,dtype=int)[1:-1]
+            outBam = pysam.AlignmentFile(oname,'wb',template=inBam)
+            for i,rec in enumerate(inBam.fetch(region=self.region)):
+                if rec.flag & 0x900:
+                    secNsup += 1
+                else:
+                    outBam.write(rec)
+                if i in breaks:
+                    outBam.close()
+                    pysam.index(oname)
+                    yield oname
+                    chunk += 1
+                    oname = outFmt.format(chunk)
+                    outBam = pysam.AlignmentFile(oname,'wb',template=inBam)
+                    chunks.append(oname)
+            outBam.close()
+            pysam.index(oname)
+            yield oname
+            self.stats['total alignments'] = i+1
+            self.stats['primary alignments'] = i+1 - secNsup
+            if self.log:
+                self.log.info(f'{i+1} Alignments chunked into {self.nproc} tmp bams; {secNsup} filtered secondary/supplemental alignments')
+
+    def _runDiagnostics(self):
+        if self.log:
+            self.log.info('Running diagnostics')
+        import matplotlib
+        matplotlib.use('agg')
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        for name,df in {'all':self.vTable,'sigvar':self.vTable[self.sigVar.columns]}.items():
+            fig,ax = plt.subplots(ncols=2)
+            fig.set_figheight(10)
+            fig.set_figwidth(20)
+            df.isnull().sum().reset_index('contig',drop=True).plot(ax=ax[0])
+            ax[0].set_ylabel('n Null Values')
+            sns.heatmap(df.isnull(),ax=ax[1],
+                        cmap="cubehelix",cbar=False,
+                        xticklabels=False,yticklabels=False)
+            fig.savefig(f'{self.prefix}{name}_cov.png',format='png',dpi=800)
+        return None
 
     def _makeSigVar(self):
         useCols = self._getSignalPos(self.vTable)
-        return self._sanitizeValues(self.vTable[useCols])
+        outdf = self._sanitizeValues(self.vTable[useCols])
+        self.stats['clustered reads'] = len(outdf)
+        if self.log:
+            self.log.debug(f'Removing reads not covering all positions. Input: {len(self.vTable)} Passing: {len(outdf)}')
+        return outdf
 
     def _homogenizeStrands(self,s):
         '''variants are coded by strand (.+2CC vs ,+2cc). This makes them the same'''
@@ -86,7 +173,7 @@ class VariantGrouper:
     def getEndpoints(self,vtbl,minCov=1):
         usePos = vtbl.notnull().sum() >= minCov
         return vtbl.columns[usePos][::sum(usePos)-1].get_level_values('pos')
-    
+
     def split(self,reads):
         '''Returns largest group of reads from position with highest entropy'''
         if self.aggressive:
@@ -112,8 +199,62 @@ class VariantGrouper:
                 return subset,pos,vnt
         return None,None,None
 
+class VariantSubCluster(VariantGrouper):
+    '''subclass of VariantGrouper with different split method'''
+    maxFeatures = 3
+    def _rankEntropy(self,counts):
+        return counts.apply(lambda p: pd.Series({'score'  :p.sum()*entropy(p.dropna()),
+                                                 'entropy':entropy(p.dropna())}))\
+                     .T.sort_values('score',ascending=False)
+
+    def _similarity(self,features,entropy):
+        sim = pd.DataFrame(0,index=features.index,columns=features.index,dtype=float)
+        for pos in features.columns:
+            for vnt,subset in features.groupby(pos):
+                #might need to change incr function to just 1
+                if len(subset) < self.minCount:
+                    continue
+                sim.loc[subset.index,subset.index] += entropy[pos]
+        return sim
+
+    def split(self,reads):
+        if self.aggressive:
+            maxReads = len(reads) - 1
+        else:
+            maxReads = len(reads) - self.minCount
+        #vTable = self.sigVar.loc[reads]
+        vTable = self.sigVar.reindex(reads)
+        counts = vTable.apply(pd.Series.value_counts).fillna(0)
+        for ch in '.*':
+            if ch in counts.index:
+                counts.drop(ch,inplace=True)
+        counts.drop(columns=counts.columns[counts.sum()==0],inplace=True)
+        ent     = self._rankEntropy(counts)
+        useCols = ent.index[:self.maxFeatures]
+        #ent = counts.apply(lambda p: p.sum()*entropy(p.dropna()))\
+        #            .sort_values(ascending=False)    
+        #useCols    = ent[ent>=np.percentile(ent,80)].index[:self.maxFeatures]
+        if self.log:
+            self.log.debug(f'Checking for groups using pos {tuple(useCols)}')
+        features   = self.sigVar.reindex(reads)[useCols]     
+        similarity = self._similarity(features,ent.entropy)
+        spectral   = SpectralClustering(n_clusters=2,affinity='precomputed')
+        scaled     = check_symmetric(MinMaxScaler().fit_transform(similarity),raise_warning=False)
+        clustv     = spectral.fit_predict(scaled)
+        #use group with most non-ref calls
+        useClust   = features.groupby(clustv).apply(lambda d:((d!='.').sum()/len(d)).mean()).idxmax()
+        size       = sum(clustv==useClust)
+        if size >= self.minCount and size <= maxReads: 
+            subset = features.index[clustv == useClust]
+            var    = features.reindex(subset).apply(pd.Series.value_counts).idxmax().values
+            return subset,tuple(useCols),tuple(var)
+        else:
+            return None,None,None
+
+
+
 class sparseDBG:
-    def __init__(self,k,collapse=1,ignoreEnds=0,minReads=5,minFrac=0.1,log=None):
+    def __init__(self,k,collapse=1,ignoreEnds=0,minReads=5,minFrac=0.1,log=None,stats={}):
         self.parser   = seqParser(k,collapse,ignoreEnds=ignoreEnds)
         self.k        = k
         self.collapse = collapse
@@ -121,6 +262,7 @@ class sparseDBG:
         self.minFrac  = minFrac
         self.log      = log
         self.nodes    = {}
+        self.stats    = stats
 
     def __repr__(self):
         return f'SparseDBG <k:{self.k} r:{self.minReads} f:{self.minFrac}>'
@@ -133,10 +275,10 @@ class sparseDBG:
         
     def loadReads(self,inFile,region=None,minLength=50,maxLength=50000):
         recGen = RecordGenerator(inFile,minLength=minLength,maxLength=maxLength)
-        self.name2idx  = {rec.name:i for i,rec in enumerate(recGen)}
+        self.name2idx  = recGen.getNameIdx()
         self.readnames = list(self.name2idx.keys())
-        self.nReads    = len(self.readnames)
-        self.minCount  = max(ceil(self.minFrac*self.nReads),self.minReads)
+        nReads         = len(self.readnames)
+        self.minCount  = max(ceil(self.minFrac*nReads),self.minReads)
         allNodes       = {}
         if self.log:
             self.log.info('Building debruijn graph')
@@ -151,6 +293,17 @@ class sparseDBG:
                     allNodes[nseq] = Node(readID=i,
                                           kmer=kmer,
                                           minCount=self.minCount)
+        #record counts
+        counts  = recGen.counter
+        secNsup = sum(counts.get(k,0) for k in ['secondary','supplementary'])
+        filtlen = sum(counts.get(k,0) for k in counts.keys() if k.startswith('long') or k.startswith('short'))
+        prim    = counts['pass']
+        self.stats.update({'total alignments'  : prim + secNsup + filtlen,
+                           'primary alignments': prim,
+                           'pileup alignments' : nReads,
+                           'clustered reads'   : nReads})
+        if self.log:
+            self.log.debug(recGen.report())
                 
     def split(self,readnames):
         rIdxs = [self.name2idx[name] for name in readnames] 
@@ -219,9 +372,7 @@ def ident(x): return x
 class seqParser:
     def __init__(self,k=11,collapseHP=1,minimizer=0,ignoreEnds=0):
         self.k         = k
-        #self.transform = hpCollapse if collapseHP else ident
         self.transform = hpCollapse(collapseHP) if collapseHP >= 1 else ident
-        #self.minim     = getMinimizer(minimizer) if minimizer>0 else ident
         self.minim     = self.getMinimizer(minimizer) if minimizer>0 else ident
         self.start     = ignoreEnds
         self.end       = -ignoreEnds if ignoreEnds else 1000000 #really big to get everything

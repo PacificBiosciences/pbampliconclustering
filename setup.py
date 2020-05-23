@@ -13,7 +13,7 @@ requirements = ["scikit-learn>=0.22",
 
 setup(
     name="pbampliconphasing",
-    version="0.0.1",
+    version="0.0.2",
     author="John Harting",
     author_email="jharting@pacificbiosciences.com",
     description="Tools for clustering PB amplicons",

@@ -1,12 +1,13 @@
-import pysam,sys
+import pysam,sys,traceback
+import pandas as pd
 from src.phase.phaser import Phaser,Phaser_Error
 from src.phase.split import Splitter_Error
-from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,PhaseUtils_Error
+from src.phase.utils import getFileType,writeSimpleBED,writeRegionBam,summary,PhaseUtils_Error,hpCollapse
 from src.phase.caller import Caller_Error
 from src.utils.bam import addHPtag,getCoordinates,exportFastq
 from src.utils.logging import getLogger
 
-DEFAULTPREFIX   = './longamp'
+#DEFAULTPREFIX   = './longamp'
 DEFAULTMINREADS = 5
 DEFAULTMINLENGTH= 50
 DEFAULTMAXLENGTH= 50000
@@ -19,11 +20,11 @@ MAXCOMPRESSSIZE = 500000
 #DEFAULTMINCOV   = 0
 
 def main(parser):
-    args = parser.parse_args()
-    
+    args   = parser.parse_args()
     #exporting prefix
-    s      = '' if args.prefix.endswith('/') else '.'
-    prefix = f'{args.prefix}{s}'
+    pref   = args.prefix if args.prefix else args.sampleName
+    s      = '' if pref.endswith('/') else '.'
+    prefix = f'{pref}{s}'
 
     #logging
     log = getLogger('lap',f'{prefix}laphase.log',stdout=args.verbose)
@@ -31,6 +32,8 @@ def main(parser):
 
     #Make sure the inputs are logically consistent with outputs
     ftype = getFileType(args.inFile)
+    if args.minSignal > args.minFrac:
+        log.warning(f'minSignal ({args.minSignal}) > minFraction ({args.minFrac}).  Some groups may be missed.')
     if args.reference is None:
         #if args.method == 'align':
         #    raise LongAmpliconPhasing_Error('Need reference for this method')
@@ -56,34 +59,57 @@ def main(parser):
          
     #########
 
-    if (args.method == 'align'  and args.maxHP != 0) \
-      or (ftype == 'fastq' and (args.method == 'align' or args.variants)):
+    if ((args.method == 'align' or args.method == 'cluster')  and args.maxHP != 0) \
+      or (ftype == 'fastq' and (args.method == 'align' or args.variants or args.method == 'cluster')):
         #need to remap
         from src.phase.utils import PilerUpper
         refseq = next(pysam.FastxFile(args.reference)).sequence if args.reference else None
-        varDf  = PilerUpper(args.inFile,
-                            region=args.region,
-                            refSeq=refseq,
-                            method=args.template,
-                            minLength=args.minLength,
-                            maxLength=args.maxLength,
-                            maxHP=args.maxHP,
-                            log=log).varDf
+        pileup  = PilerUpper(args.inFile,
+                             region=args.region,
+                             refSeq=refseq,
+                             method=args.template,
+                             minLength=args.minLength,
+                             maxLength=args.maxLength,
+                             maxHP=args.maxHP,
+                             log=log,
+                             nproc=args.nproc)
+                             #multifunc=getRow)
+        varDf   = pileup.varDf
+        counts = pileup.recGen.counter
+        secNsup = sum(counts.get(k,0) for k in ['secondary','supplementary'])
+        filtlen = sum(counts.get(k,0) for k in counts.keys() if k.startswith('long') or k.startswith('short'))
+        prim    = pileup.recGen.counter['pass']
+        stats   = {'total alignments'  : prim + secNsup + filtlen,
+                   'primary alignments': prim,
+                   'pileup alignments' : len(varDf)}
     else:
         varDf = None
+        stats = {}
 
     #load splitter class
-    if args.method == 'align':
-        from src.phase.split import VariantGrouper
-        splitter = VariantGrouper(args.inFile,
-                                  args.reference,
-                                  region=args.region,
-                                  truncate=args.truncate,
-                                  minFrac=args.minFrac,
-                                  minReads=args.minReads,
-                                  minSignal=args.minSignal,
-                                  aggressive=args.aggressive,
-                                  vTable=varDf,log=log)
+    if args.method != 'debruijn':
+        if args.method == 'align':
+            from src.phase.split import VariantGrouper
+            sclass = VariantGrouper
+        elif args.method == 'cluster':
+            from src.phase.split import VariantSubCluster
+            sclass = VariantSubCluster
+        else: 
+            raise LongAmpliconPhasing_Error(f'unknown method: {args.method}')
+        splitter = sclass(args.inFile,
+                           args.reference,
+                           region=args.region,
+                           truncate=args.truncate,
+                           minFrac=args.minFrac,
+                           minReads=args.minReads,
+                           minSignal=args.minSignal,
+                           aggressive=args.aggressive,
+                           indels=args.indels,
+                           vTable=varDf,
+                           prefix=prefix,
+                           nproc=args.nproc, 
+                           makeDf=makeDf,
+                           log=log,stats=stats)
     elif args.method == 'debruijn':
         from src.phase.split import sparseDBG
         splitter = sparseDBG(args.k,
@@ -96,7 +122,7 @@ def main(parser):
                            minLength=args.minLength,
                            maxLength=args.maxLength)
     else:
-        raise LongAmpliconPhasing_Error('unknown method')
+        raise LongAmpliconPhasing_Error(f'unknown method: {args.method}')
 
     phaser = Phaser(splitter,
                     args.sampleName,
@@ -128,7 +154,7 @@ def main(parser):
         else:
             ft = 'bam' if args.inFile.endswith('bam') else 'fastq'   
             log.info("Exporting Fastq files")
-            exportFastq(args.inFile,ft,args.prefix,
+            exportFastq(args.inFile,ft,prefix,
                         phaser.clusterMap,region=args.region)
     #simple decision tree
     log.info('Writing Splits')
@@ -161,7 +187,11 @@ def main(parser):
                                        minReads=args.minReads,
                                        minSignal=args.minSignal,
                                        aggressive=args.aggressive,
-                                       vTable=None,log=log)
+                                       indels=args.indels,
+                                       vTable=None,log=log,
+                                       prefix=prefix,
+                                       makeDf=makeDf,
+                                       nproc=args.nproc)
         else:
             vsplitter = splitter
 
@@ -172,23 +202,29 @@ def main(parser):
                                   phaser.clusterMap,
                                   endpoints,
                                   log=log)
+        #reads counts
+        log.info('Writing Run Summary')
+        name = f'{prefix}summary.txt'
+        with open(name,'w') as ofile:
+            ofile.write(f'{summary(splitter,caller)}\n')
+
         #summary table
         log.info('Writing Cluster Summary')
-        name = f'{args.prefix}{s}alleleClusterSummary.csv'
+        name = f'{prefix}alleleClusterSummary.csv'
         caller.alleleFrequency(caller.clusterMap).to_csv(name)
         log.info('Writing Sample Variant Summary')
-        name = f'{args.prefix}{s}sampleVariantSummary.csv'
+        name = f'{prefix}sampleVariantSummary.csv'
         caller.alleleFrequency(caller.variantGroupMap)\
               .reindex(list(set(caller.variantGroupMap.values())))\
               .to_csv(name)
         
         #total allele fractions (draft)
         log.info('Writing Variant Fraction File')
-        name = f'{args.prefix}{s}variantFraction.csv'
+        name = f'{prefix}variantFraction.csv'
         caller.variantFractions.to_csv(name)
         #draft consensus
         log.info('Generating draft consensus')
-        name = f'{args.prefix}{s}draft.consensus.fasta'
+        name = f'{prefix}draft.consensus.fasta'
         with open(name,'w') as ofasta:
             for clust,seq in caller.draftConsensus().items():
                 clust = clust if clust!=-1 else 'Noise'
@@ -196,22 +232,43 @@ def main(parser):
                 ofasta.write(seq + '\n')
         #entropy
         log.info('Writing entropy table')
-        name = f'{args.prefix}{s}entropy.csv'
+        name = f'{prefix}entropy.csv'
         caller.entropy.to_csv(name)
         if args.entropyPlot:
             log.info('Writing entropy heatmap')
-            name = f'{args.prefix}{s}entropy.{FIGFORMAT}'
+            name = f'{prefix}entropy.{FIGFORMAT}'
             caller.entropyPlot(name)
     
+    log.info('Done')
+
     for handler in log.handlers:
         handler.close()
         log.removeFilter(handler)
 
     return phaser
-                                 
+
+###multiproc definitions for pickling
+
+def makeDf(bamfile,reference,region=None,truncate=False):
+    bam = pysam.AlignmentFile(bamfile,'r')
+    ref = pysam.FastaFile(reference)
+    df  = pd.DataFrame({(column.reference_name,
+                         column.reference_pos)  : dict(zip(column.get_query_names(),
+                                                        column.get_query_sequences(mark_matches=True,
+                                                                                   add_indels=True)))
+                       for column in bam.pileup(flag_filter=0x900,
+                                                 fastafile=ref,region=region,
+                                                 truncate=truncate,
+                                                 min_base_quality=0,
+                                                 compute_baq=False)})
+    df.columns.names = ('contig','pos')
+    return df
+
+
+########
+
 class LongAmpliconPhasing_Error(Exception):
     pass
-
 
 if __name__ == '__main__':
     import argparse,sys
@@ -222,6 +279,8 @@ if __name__ == '__main__':
                     help='Fasta,Fastq, or BAM containing CCS reads')
     parser.add_argument('sampleName', metavar='sampleName', type=str,
                     help='sample name')
+    parser.add_argument('-j', dest='nproc', type=int, default=1,
+                    help=f'Number of procs to use for loading data')
     parser.add_argument('--reference', dest='reference', type=str, default=None,
                     help='reference fasta used for alignment.  Required for draft consensus and variant counts')
     parser.add_argument('--region', dest='region', type=str,default=None,
@@ -230,10 +289,12 @@ if __name__ == '__main__':
                     help='Truncate to columns only within region (pysam pileup).  Default False')
     parser.add_argument('-k','--kmer', dest='k', type=int, default=DEFAULTKMER,
                     help=f'Kmer size for debruijn method.  Ignored for align method. Default {DEFAULTKMER}')
+    parser.add_argument('--no-indels', dest='indels', action='store_false', default=True,
+                    help='Do not split on indels (only for alignm method).  Default use indels')
     parser.add_argument('-i','--ignore', dest='ignore', type=int, default=0,
                     help=f'Ignore first and last N bases when building debruijn graph. Not used for align method. Default 0')
-    parser.add_argument('-p','--prefix', dest='prefix', type=str, default='',
-                    help=f'Output prefix. Default {DEFAULTPREFIX}')
+    parser.add_argument('-p','--prefix', dest='prefix', type=str, default=None,
+                    help=f'Output prefix. Default cwd')
     parser.add_argument('-d','--drop', dest='drop', action='store_true', default=False,
                     help='Drop noise/other reads.  Default False')
     parser.add_argument('-s','--splitBam', dest='splitBam', action='store_true', default=False,
@@ -262,7 +323,7 @@ if __name__ == '__main__':
                     help='Export Fastq per phase. Default False')
     parser.add_argument('--template', dest='template', choices=['first','median'], default='median',
                     help='Method for choosing reference template from inputs (if no reference passed). Default median')
-    parser.add_argument('-m','--method', dest='method', choices=['align','debruijn'], default='align',
+    parser.add_argument('-m','--method', dest='method', choices=['align','debruijn','cluster'], default='align',
                     help='Splitting method.  If align and maxHP != 0, reads will be realigned after compression for clustering; Output variants are from non-compressed pileup. Default align')
     parser.add_argument('--verbose', dest='verbose', action='store_true', default=False,
                     help='Print progress messages to stdout. Default False')
