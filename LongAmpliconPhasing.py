@@ -143,7 +143,7 @@ def main(parser):
             outBED = f'{prefix}region.bed'
             writeSimpleBED(*getCoordinates(args.region),
                             args.sampleName,
-                            phaser.splitter.nReads,
+                            phaser.splitter.stats['clustered reads'],
                             outBED)
             outBAM = f'{prefix}region.bam'
             writeRegionBam(args.inFile,outBAM,args.region)
@@ -170,7 +170,8 @@ def main(parser):
     #check if anything was produced, else exit
     hasResults = True
     if len(phaser.node2cluster) == 0:
-        log.warning(f'No results produced for sample {phaser.sampleName}.  Nreads: {phaser.splitter.nReads}')
+        nreads = phaser.splitter.stats['clustered reads']
+        log.warning(f'No results produced for sample {phaser.sampleName}.  Nreads: {nreads}')
         hasResults = False
     #variants/consensus
     if args.variants:

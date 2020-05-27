@@ -14,7 +14,7 @@ def summary(splitter,caller):
         minsig   = splitter.minSignal
         minfrac  = splitter._minFrac
         minreads = splitter._minReads
-        feat     = len(splitter.sigVar)
+        feat     = len(splitter.sigVar.columns)
     except AttributeError:
         minsig,minfrac,minreads = ('NA',)*3
         feat = len(splitter.nodes)
