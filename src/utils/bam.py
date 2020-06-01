@@ -41,6 +41,8 @@ def addHPtag(args,outBAM,clusterMap,noCluster=NOCLUST):
         recGen = inbam.fetch(*getCoordinates(args.region)) if args.region else inbam
         for rec in recGen:
             if dropFilt:
+                if rec.flag & 0x900:
+                    continue
                 if rec.query_name not in clusterMap: #filtered
                     continue
                 elif clusterMap[rec.query_name] == -1: #noise
