@@ -105,6 +105,7 @@ def main(parser):
                            minSignal=args.minSignal,
                            aggressive=args.aggressive,
                            indels=args.indels,
+                           hpmask=args.hpmax,
                            vTable=varDf,
                            prefix=prefix,
                            nproc=args.nproc, 
@@ -189,6 +190,7 @@ def main(parser):
                                        minSignal=args.minSignal,
                                        aggressive=args.aggressive,
                                        indels=args.indels,
+                                       hpmask=args.hpmax,
                                        vTable=None,log=log,
                                        prefix=prefix,
                                        makeDf=makeDf,
@@ -316,6 +318,8 @@ if __name__ == '__main__':
                     help=f'Minimum fraction of reads with non-ref calls for consideration.  Default {DEFAULTMINSIG}')
     parser.add_argument('-H','--maxHP', dest='maxHP', type=int, default=0,
                     help='Max length of homopolymer seqs.  Set to 0 to turn of hp collapsing.  Default 0')
+    parser.add_argument('-M','--maskHp', dest='hpmax', type=int, default=0,
+                    help='Max length of homopolymer seqs within which to call variants.  Set to 0 to turn of hp masking.  Default 0')
     parser.add_argument('-a','--aggressive', dest='aggressive', action='store_true', default=False,
                     help='More aggressively split groups (experimental).  Default False')
     parser.add_argument('-e','--entropyPlot', dest='entropyPlot', action='store_true', default=False,

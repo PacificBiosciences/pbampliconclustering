@@ -1,7 +1,8 @@
-import pysam,os
+import pysam,os,re
 from math import ceil
 import pandas as pd
 import numpy as np
+from itertools import chain
 from collections import Counter
 from scipy.stats import entropy
 from operator import itemgetter
@@ -10,6 +11,7 @@ from sklearn.cluster import SpectralClustering
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.utils.validation import check_symmetric
 from .utils import hpCollapse,RecordGenerator
+from ..utils.extract import getCoordinates
 
 DIAGNOSTICS=False
 
@@ -20,6 +22,7 @@ class VariantGrouper:
                  minReads=10,minSpan=0.9,
                  minSignal=0.05,flagFilter=0x900,
                  aggressive=False,indels=True,
+                 hpmask=0,hptol=0,
                  vTable=None,nproc=1,prefix=None,
                  makeDf=None,log=None,stats={},
                  diagnostics=DIAGNOSTICS):
@@ -35,6 +38,8 @@ class VariantGrouper:
         self.flagFilter = flagFilter         #hex filters, passed to pysam.pileup engine
         self.aggressive = aggressive
         self.indels     = indels             #use indels for variants
+        self.hpmask     = hpmask             #mask variants in homopolymers larger than this size; incl ins at beginning
+        self.hptol      = hptol              #mask tolerance (added to hpmask on either side of each hp)
         self.nproc      = nproc
         self.prefix     = prefix
         self.makeDf     = makeDf             #pickle-able function for parallel processing
@@ -59,7 +64,27 @@ class VariantGrouper:
         fracVar     = (~matchOrNa).sum(axis=0)/len(vdf)
         if self.log:
             self.log.info(f'Reducing feature space: using {sum(fracVar >= self.minSignal)} positions')
-        return vdf.columns[fracVar >= self.minSignal]
+        cols = vdf.columns[fracVar >= self.minSignal]
+        if self.hpmask > 0:
+            patt = re.compile(rf'([ATGC])\1{{{self.hpmask},}}')
+            ref  = pysam.FastaFile(self.refFasta)
+            if self.region:
+                region      = self.region
+                ctg,start,_ = getCoordinates(self.region)
+                start -= 1
+            else:
+                region    = ref.references[0] 
+                ctg,start = region,0
+            sequence = ref.fetch(region=region)
+            mask = list(chain(*([(ctg,p+start) for p in range(m.start()-1,m.end())] 
+                                for m in patt.finditer(sequence))))
+        else:
+            mask = []
+        if self.truncate and self.region:
+            ctg,start,stop = getCoordinates(self.region)
+            rgn  = [(ctg,p) for p in range(start,stop+1)]
+            cols = cols[cols.isin(rgn)]
+        return cols[~cols.isin(mask)]
     
     def _getMinCount(self):
         return max(self._minReads,ceil(self._minFrac*self.stats['clustered reads']))    
