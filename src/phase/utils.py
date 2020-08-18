@@ -163,17 +163,17 @@ class RecordGenerator:
         if rec.flag & 0x800:
             return 'supplementary'
         if rec.query_length < self.minLen:
-            return f'short(<{self.minLength})'
+            return f'short(<{self.minLen})'
         if rec.query_length > self.maxLen:
-            return f'long(>{self.maxLength})'
+            return f'long(>{self.maxLen})'
         else:
             return 'pass'
 
     def _classifyFq(self,rec):
         if len(rec.sequence) < self.minLen:
-            return f'short(<{self.minLength})'
+            return f'short(<{self.minLen})'
         if len(rec.sequence) > self.maxLen:
-            return f'long(>{self.maxLength})'
+            return f'long(>{self.maxLen})'
         else:
             return 'pass'
 
