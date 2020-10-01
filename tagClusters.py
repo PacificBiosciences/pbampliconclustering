@@ -7,7 +7,7 @@ parser.add_argument('inbam',help='bam contaning hifi reads to tag',
                     type=str)
 parser.add_argument('readInfo',help='read_info.txt output from hifi amplicon cluster',
                     type=str)
-parser.add_argument('outbam',help='output bam prefix',type=str)
+parser.add_argument('outbam',help='output bam',type=str)
 parser.add_argument('--names',help='zero-indexed column number with read names. default 0',
                     type=int,default=0)
 parser.add_argument('--cluster',help='zero-indexed column number with cluster number. default 8',
