@@ -17,16 +17,16 @@ MAXLEN   =25000
 MAXPALOVR=250 #max rev comp overlap bwtn primary/supp alignments
 RANDSEED =17
 
-#_PATT = re.compile(r'([ATGC])\1+')
-#def hpCollapse(seq):
-#    return _PATT.sub(r'\1',seq)
-
 def qualityCrit(minqv):
     if minqv == 0: #turn off
         crit = noFilter
     else:
         def crit(rec):
-            return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
+            try:
+                return rec.get_tag('rq') >= minqv #and not (rec.flag & 0x900)
+            except Exception as e:
+                print(f'WARNING: Skipping {rec} due to quality error {e}')
+                return False
     return crit
 
 def getLengthCrit(minLen,maxLen):
@@ -41,11 +41,6 @@ def getFlankCrit(flankFa):
         a = mp.Aligner(seq=rec.query_sequence,preset='sr')
         return np.all([len(list(a.map(f)))==1 for f in flanks])
     return includesFlanks
-
-#def getMinimizer(m=6):
-#    def minimizer(seq):
-#        return sorted(seq[i:i+m] for i in range(0,len(seq)-m+1))[0]
-#    return minimizer
 
 def noFilter(x):
     return True
